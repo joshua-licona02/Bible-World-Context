@@ -1,0 +1,527 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Bible World Context historical and regional research explorer.">
+  <title>Bible World Context</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">BIBLICAL · HISTORICAL · REGIONAL RESEARCH</p>
+        <h1>Bible World Context</h1>
+        <p class="topbar-subtitle">
+          Explore Biblical passages alongside Biblical events, world history,
+          and region-specific historical developments.
+        </p>
+      </div>
+
+      <div class="topbar-actions">
+        <div id="connectionStatus" class="status-chip" aria-live="polite">
+          <span class="status-dot status-neutral"></span>
+          Local context mode
+        </div>
+        <button id="openLlmSettings" class="button button-secondary" type="button">AI settings</button>
+      </div>
+    </header>
+
+    <nav class="workspace-tabs" role="tablist" aria-label="Workspaces">
+      <button id="tabAnalysis" class="workspace-tab" type="button" role="tab" aria-selected="true" aria-controls="analysisWorkspace">
+        Context analysis
+      </button>
+      <button id="tabTimeline" class="workspace-tab" type="button" role="tab" aria-selected="false" aria-controls="timelineWorkspace">
+        Timeline search
+      </button>
+    </nav>
+
+    <main id="analysisWorkspace" class="content-grid" role="tabpanel" aria-labelledby="tabAnalysis">
+      <aside class="panel control-panel">
+        <div class="panel-heading">
+          <div>
+            <p class="section-label">REFERENCE AND RESEARCH</p>
+            <h2>Search controls</h2>
+          </div>
+        </div>
+
+        <form id="referenceForm" novalidate>
+          <label for="referenceInput">Bible reference</label>
+          <input
+            id="referenceInput"
+            type="text"
+            placeholder="Examples: John 19, Daniel 6, 1 Kings 18:20-39"
+            autocomplete="off"
+          >
+
+          <label for="passageText">Optional passage text</label>
+          <textarea
+            id="passageText"
+            rows="5"
+            placeholder="Paste the passage text for more passage-specific Ollama analysis."
+          ></textarea>
+
+          <button id="analyzeButton" class="button button-primary full-width" type="submit">
+            Analyze Biblical Context
+          </button>
+        </form>
+
+        <hr class="divider">
+
+        <section aria-labelledby="regionalSearchTitle">
+          <p class="section-label">WORLD BY REGION</p>
+          <h2 id="regionalSearchTitle">Search a historical setting</h2>
+
+          <label for="historicalAnchor">Historical anchor</label>
+          <select id="historicalAnchor">
+            <option value="reference">Use Bible reference era</option>
+          </select>
+
+          <div class="two-column">
+            <div>
+              <label for="customStartYear">Start year</label>
+              <input id="customStartYear" type="number" placeholder="29">
+            </div>
+
+            <div>
+              <label for="customEndYear">End year</label>
+              <input id="customEndYear" type="number" placeholder="34">
+            </div>
+          </div>
+
+          <p class="field-help">
+            Use negative years for BCE. Example: <strong>-586</strong>.
+          </p>
+
+          <label for="continentSelect">Continent</label>
+          <select id="continentSelect">
+            <option value="All">All continents</option>
+          </select>
+
+          <label for="regionSelect">Regional focus</label>
+          <select id="regionSelect">
+            <option value="All">All regions</option>
+          </select>
+
+          <label for="compareRegions">Compare regions</label>
+          <select id="compareRegions" multiple size="5">
+            <option value="West Asia / Near East">West Asia / Near East</option>
+            <option value="East Asia">East Asia</option>
+            <option value="South Asia">South Asia</option>
+            <option value="Central Asia">Central Asia</option>
+            <option value="Europe">Europe</option>
+            <option value="Africa">Africa</option>
+            <option value="North America">North America</option>
+            <option value="South America">South America</option>
+            <option value="Oceania">Oceania</option>
+          </select>
+
+          <button id="regionalSearchButton" class="button button-secondary full-width" type="button">
+            View Regional History
+          </button>
+        </section>
+
+        <hr class="divider">
+
+        <section aria-labelledby="researchTitle">
+          <p class="section-label">OPTIONAL EVIDENCE COLLECTION</p>
+          <h2 id="researchTitle">Public-source research</h2>
+
+          <label class="checkbox-label" for="useResearch">
+            <input id="useResearch" type="checkbox">
+            <span>Search public encyclopedia records</span>
+          </label>
+
+          <label for="researchTopic">Research topic override</label>
+          <input
+            id="researchTopic"
+            type="text"
+            placeholder="Example: Asia during the crucifixion of Jesus"
+          >
+
+          <label for="sourceUrls">Optional source URLs</label>
+          <textarea
+            id="sourceUrls"
+            rows="4"
+            placeholder="One public URL per line. Only CORS-accessible pages can be read."
+          ></textarea>
+
+          <label for="maxSources">Maximum collected sources</label>
+          <select id="maxSources">
+            <option value="4">4 sources</option>
+            <option value="6" selected>6 sources</option>
+            <option value="8">8 sources</option>
+          </select>
+        </section>
+
+        <hr class="divider">
+
+        <section aria-labelledby="ollamaTitle">
+          <p class="section-label">LOCAL LLM</p>
+          <h2 id="ollamaTitle">AI synthesis</h2>
+
+          <label class="checkbox-label" for="useOllama">
+            <input id="useOllama" type="checkbox">
+            <span>Use the configured model for expanded synthesis</span>
+          </label>
+
+          <p id="llmSummaryLine" class="field-help"></p>
+        </section>
+
+        <div id="formMessage" class="form-message" aria-live="polite"></div>
+      </aside>
+
+      <section class="panel results-panel" aria-labelledby="resultsTitle">
+        <div class="panel-heading">
+          <div>
+            <p class="section-label">ANALYSIS RESULTS</p>
+            <h2 id="resultsTitle">Historical context</h2>
+          </div>
+          <span id="referenceBadge" class="pill pill-muted">Awaiting search</span>
+        </div>
+
+        <div id="emptyState" class="empty-state">
+          <div class="empty-icon">⌁</div>
+          <h3>Search a Bible reference or historical period</h3>
+          <p>
+            Use a Biblical reference for passage context, or select a historical anchor
+            and region to explore what was happening elsewhere in the world.
+          </p>
+        </div>
+
+        <div id="resultContent" class="hidden">
+          <section class="result-section">
+            <h3>Bottom Line</h3>
+            <div id="blufContent" class="narrative-card"></div>
+          </section>
+
+          <section class="result-section">
+            <h3>Historical Setting</h3>
+            <div id="historicalSettingContent" class="narrative-card"></div>
+          </section>
+
+          <section class="result-section">
+            <h3>Original-Setting Context</h3>
+            <div id="applicationContent" class="narrative-card"></div>
+          </section>
+
+          <section class="result-section">
+            <h3>Timeline View</h3>
+            <p class="section-description">
+              Dates are approximate unless otherwise supported by the selected evidence.
+            </p>
+            <div id="timelineChart" class="chart-frame"></div>
+            <button id="exploreInTimeline" class="button button-secondary" type="button">
+              Explore this period in Timeline search
+            </button>
+          </section>
+
+          <section class="result-section">
+            <h3>Regional Comparison</h3>
+            <div id="regionalComparison" class="comparison-grid"></div>
+          </section>
+
+          <section class="result-section">
+            <h3>Biblical Events</h3>
+            <div id="biblicalEventsTable" class="table-frame"></div>
+          </section>
+
+          <section class="result-section">
+            <h3>World and Regional Events</h3>
+            <div id="worldEventsTable" class="table-frame"></div>
+          </section>
+
+          <section class="result-section">
+            <h3>Collected Research Sources</h3>
+            <div id="sourcesTable" class="table-frame"></div>
+          </section>
+
+          <section class="result-section">
+            <h3>Method and Cautions</h3>
+            <div id="methodNotes" class="method-notes"></div>
+          </section>
+        </div>
+      </section>
+
+      <aside class="panel audit-panel" aria-labelledby="auditTitle">
+        <div class="panel-heading">
+          <div>
+            <p class="section-label">SYSTEM ACTIVITY</p>
+            <h2 id="auditTitle">Audit log</h2>
+          </div>
+        </div>
+
+        <div id="metricsContent" class="metric-stack"></div>
+        <div id="auditLog" class="audit-log" aria-live="polite"></div>
+      </aside>
+    </main>
+
+    <main id="timelineWorkspace" class="timeline-grid hidden" role="tabpanel" aria-labelledby="tabTimeline">
+      <aside class="panel control-panel">
+        <div class="panel-heading">
+          <div>
+            <p class="section-label">MULTI-SOURCE RESEARCH</p>
+            <h2>Timeline search</h2>
+          </div>
+        </div>
+
+        <form id="tlForm" novalidate>
+          <label for="tlQuery">Question, keywords, or Bible reference</label>
+          <textarea
+            id="tlQuery"
+            rows="3"
+            placeholder="Examples: What was happening in China and India during the Babylonian exile? · Maccabean revolt · 1st century BC · Acts 18"
+          ></textarea>
+
+          <div class="two-column">
+            <div>
+              <label for="tlStart">Start year</label>
+              <input id="tlStart" type="number" placeholder="auto">
+            </div>
+            <div>
+              <label for="tlEnd">End year</label>
+              <input id="tlEnd" type="number" placeholder="auto">
+            </div>
+          </div>
+          <p class="field-help">
+            Leave blank to infer the range from your question or from the results. Negative years are BCE.
+          </p>
+
+          <div class="two-column">
+            <div>
+              <label for="tlContinent">Continent</label>
+              <select id="tlContinent">
+                <option value="All">All continents</option>
+              </select>
+            </div>
+            <div>
+              <label for="tlRegion">Region</label>
+              <select id="tlRegion">
+                <option value="All">All regions</option>
+              </select>
+            </div>
+          </div>
+
+          <label for="tlDepth">Search depth</label>
+          <select id="tlDepth">
+            <option value="quick">Quick — a few pages, fastest</option>
+            <option value="standard" selected>Standard — balanced</option>
+            <option value="deep">Deep — more pages and queries</option>
+          </select>
+
+          <fieldset class="option-group">
+            <legend>Sources</legend>
+            <div id="tlProviderOptions"></div>
+            <label for="tlSearxEndpoint">SearXNG URL (optional)</label>
+            <input id="tlSearxEndpoint" type="url" placeholder="http://localhost:8888" spellcheck="false">
+            <label for="tlUrls">Extra public URLs</label>
+            <textarea id="tlUrls" rows="2" placeholder="One per line. Only sites that allow cross-origin reads work."></textarea>
+          </fieldset>
+
+          <fieldset class="option-group">
+            <legend>AI assistance</legend>
+            <label class="checkbox-label" for="tlLlmPlan">
+              <input id="tlLlmPlan" type="checkbox">
+              <span>Interpret my question into a search plan</span>
+            </label>
+            <label class="checkbox-label" for="tlLlmExtract">
+              <input id="tlLlmExtract" type="checkbox">
+              <span>Extract dated events from web results and URLs</span>
+            </label>
+            <label class="checkbox-label" for="tlLlmGapFill">
+              <input id="tlLlmGapFill" type="checkbox">
+              <span>Suggest missing events, then verify each one</span>
+            </label>
+            <p id="tlLlmLine" class="field-help"></p>
+          </fieldset>
+
+          <div class="button-row">
+            <button id="tlSearchButton" class="button button-primary" type="submit">Search timeline</button>
+            <button id="tlStopButton" class="button button-secondary hidden" type="button">Stop</button>
+          </div>
+          <div id="tlFormMessage" class="form-message" aria-live="polite"></div>
+        </form>
+      </aside>
+
+      <section class="panel results-panel" aria-labelledby="tlResultsTitle">
+        <div class="panel-heading">
+          <div>
+            <p class="section-label">MERGED TIMELINE</p>
+            <h2 id="tlResultsTitle">Events across sources</h2>
+          </div>
+          <span id="tlRangeBadge" class="pill pill-muted">Awaiting search</span>
+        </div>
+
+        <div id="tlProviderStatus" class="provider-status" aria-live="polite"></div>
+        <div id="tlPlanSummary" class="plan-summary hidden"></div>
+
+        <div id="tlEmpty" class="empty-state">
+          <div class="empty-icon">⌁</div>
+          <h3>Search the timeline</h3>
+          <p>
+            Ask a question or give a date range. Results from Wikipedia's chronicles, Wikipedia and Wikidata,
+            OpenAlex, and your own sources are merged into one timeline, with duplicates combined and every event linked to its sources.
+          </p>
+        </div>
+
+        <div id="tlResults" class="hidden">
+          <div class="tl-toolbar">
+            <label for="tlGroupBy">Group by
+              <select id="tlGroupBy">
+                <option value="region">Region</option>
+                <option value="domain">Domain</option>
+                <option value="category">Category</option>
+                <option value="source">Source</option>
+              </select>
+            </label>
+            <label for="tlFilterText">Filter
+              <input id="tlFilterText" type="search" placeholder="Text in title or summary">
+            </label>
+            <label for="tlFilterCategory">Category
+              <select id="tlFilterCategory">
+                <option value="All">All</option>
+                <option value="conflict">Conflict</option>
+                <option value="politics">Politics</option>
+                <option value="religion">Religion</option>
+                <option value="culture">Culture</option>
+                <option value="science">Science</option>
+                <option value="economy">Economy</option>
+                <option value="disaster">Disaster</option>
+                <option value="people">People</option>
+                <option value="other">Other</option>
+              </select>
+            </label>
+            <label for="tlFilterConfidence">Min. confidence
+              <select id="tlFilterConfidence">
+                <option value="0">Any</option>
+                <option value="0.55">Medium+</option>
+                <option value="0.75">High</option>
+              </select>
+            </label>
+            <label class="checkbox-label" for="tlShowUnverified">
+              <input id="tlShowUnverified" type="checkbox">
+              <span>Show unverified AI suggestions</span>
+            </label>
+          </div>
+
+          <div class="tl-zoom">
+            <button id="tlZoomIn" class="button button-secondary" type="button" aria-label="Zoom in">＋</button>
+            <button id="tlZoomOut" class="button button-secondary" type="button" aria-label="Zoom out">－</button>
+            <button id="tlZoomReset" class="button button-secondary" type="button">Fit search range</button>
+            <span id="tlViewLabel" class="field-help"></span>
+          </div>
+
+          <div id="tlChart" class="chart-frame tl-chart"></div>
+          <div id="tlLegend" class="tl-legend"></div>
+          <p class="section-description">
+            Drag to pan, Ctrl + scroll to zoom, click an event for details. Dashed or faded marks carry approximate or coarse dates.
+          </p>
+
+          <section id="tlDetail" class="tl-detail hidden" aria-live="polite"></section>
+
+          <section class="result-section">
+            <h3>Coverage by lane</h3>
+            <div id="tlLaneSummary" class="comparison-grid"></div>
+          </section>
+
+          <section class="result-section">
+            <div class="section-heading-row">
+              <h3>Period synthesis</h3>
+              <button id="tlSummarize" class="button button-secondary" type="button">Summarize with AI</button>
+            </div>
+            <div id="tlSummary" class="narrative-card ai-output">
+              <p class="muted">Generate a comparative, cited overview of the events in view.</p>
+            </div>
+          </section>
+
+          <section class="result-section">
+            <div class="section-heading-row">
+              <h3 id="tlEventsHeading">Events</h3>
+              <div class="button-row compact">
+                <button id="tlExportCsv" class="button button-secondary" type="button">CSV</button>
+                <button id="tlExportMd" class="button button-secondary" type="button">Markdown</button>
+                <button id="tlExportJson" class="button button-secondary" type="button">JSON</button>
+              </div>
+            </div>
+            <div id="tlEventsTable" class="table-frame"></div>
+          </section>
+
+          <section class="result-section">
+            <h3>Reading and evidence sources</h3>
+            <div id="tlSourcesTable" class="table-frame"></div>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <dialog id="llmDialog" class="settings-dialog" aria-labelledby="llmDialogTitle">
+      <form method="dialog">
+        <div class="panel-heading">
+          <div>
+            <p class="section-label">SHARED BY BOTH WORKSPACES</p>
+            <h2 id="llmDialogTitle">AI settings</h2>
+          </div>
+        </div>
+
+        <label for="llmProvider">Provider</label>
+        <select id="llmProvider">
+          <option value="ollama">Ollama</option>
+          <option value="openai">OpenAI-compatible (LM Studio, llama.cpp, vLLM, Jan, OpenRouter…)</option>
+        </select>
+
+        <label for="ollamaEndpoint">Server URL</label>
+        <input id="ollamaEndpoint" type="url" value="http://localhost:11434" spellcheck="false">
+
+        <label for="ollamaModel">Model</label>
+        <div class="input-with-button">
+          <input id="ollamaModel" type="text" list="llmModelOptions" value="llama3.2" spellcheck="false" autocomplete="off">
+          <button id="llmRefreshModels" class="button button-secondary" type="button">Refresh models</button>
+        </div>
+        <datalist id="llmModelOptions"></datalist>
+
+        <label for="llmApiKey">API key (optional)</label>
+        <input id="llmApiKey" type="password" autocomplete="off" spellcheck="false" placeholder="Only for hosted OpenAI-compatible services">
+        <p class="field-help">
+          The key is kept in memory for this page only and is never saved. For Ollama opened from a file, set
+          <code>OLLAMA_ORIGINS=*</code> and restart Ollama so the browser is allowed to connect.
+        </p>
+
+        <div class="button-row">
+          <button id="testOllamaButton" class="button button-secondary" type="button">Test connection</button>
+          <button class="button button-primary" type="submit" value="close">Done</button>
+        </div>
+        <div id="llmDialogMessage" class="form-message" aria-live="polite"></div>
+      </form>
+    </dialog>
+
+    <footer class="footer">
+      <span>Local-first Bible, history, and public-source research explorer.</span>
+      <span>Regional event coverage is selective and is not a complete record of world history.</span>
+    </footer>
+  </div>
+
+  <script src="js/00-core.js"></script>
+  <script src="js/01-dom.js"></script>
+  <script src="js/02-utils.js"></script>
+  <script src="js/03-data.js"></script>
+  <script src="js/04-clean.js"></script>
+  <script src="js/05-model.js"></script>
+  <script src="js/06-analytics.js"></script>
+  <script src="js/07-charts.js"></script>
+  <script src="js/08-tables.js"></script>
+  <script src="js/09-ollama.js"></script>
+  <script src="js/10-sources.js"></script>
+  <script src="js/11-research.js"></script>
+  <script src="js/12-synthesis.js"></script>
+  <script src="js/13-http.js"></script>
+  <script src="js/14-llm.js"></script>
+  <script src="js/15-timeline-model.js"></script>
+  <script src="js/16-timeline-providers.js"></script>
+  <script src="js/17-timeline-ai.js"></script>
+  <script src="js/18-timeline-view.js"></script>
+  <script src="js/19-timeline-controller.js"></script>
+  <script src="js/99-controller.js"></script>
+</body>
+</html>
