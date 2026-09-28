@@ -108,7 +108,9 @@
 
       String(text || "").split(/\r?\n/).forEach(function (rawLine) {
         var line = rawLine.trim();
-        var heading = line.match(/^(#{1,4})\s+(.*)$/);
+        // A line that is entirely bold ("**Effect on the community**") is used as a sub-heading by many models.
+        var boldLine = line.match(/^\*\*([^*]+?)\*\*:?$/);
+        var heading = line.match(/^(#{1,4})\s+(.*)$/) || (boldLine ? [line, "###", boldLine[1]] : null);
         var bullet = line.match(/^(?:[-*•]|\d+[.)])\s+(.*)$/);
 
         if (!line) {

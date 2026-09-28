@@ -147,6 +147,59 @@
     };
   });
 
+  // Books whose chapters belong to different eras: [firstChapter, lastChapter, eraId, note].
+  APP.data.chapterEras = {
+    "Isaiah": [
+      [1, 39, "assyrianCrisis", "First Isaiah (chapters 1–39), largely set in the eighth-century Assyrian crisis"],
+      [40, 55, "exile", "Second Isaiah (chapters 40–55), widely dated to the late Babylonian exile"],
+      [56, 66, "persian", "Third Isaiah (chapters 56–66), widely dated to the early Persian-period restoration"]
+    ],
+    "1 Kings": [
+      [1, 11, "unitedMonarchy", "Solomon's reign (chapters 1–11)"],
+      [12, 22, "dividedKingdom", "The divided kingdoms (chapters 12–22)"]
+    ],
+    "2 Kings": [
+      [1, 16, "dividedKingdom", "The divided kingdoms (chapters 1–16)"],
+      [17, 23, "assyrianCrisis", "The fall of Samaria and Judah under Assyria (chapters 17–23)"],
+      [24, 25, "exile", "Babylonian conquest and exile (chapters 24–25)"]
+    ],
+    "2 Chronicles": [
+      [1, 9, "unitedMonarchy", "Solomon's reign (chapters 1–9)"],
+      [10, 27, "dividedKingdom", "Judah's kings after the division (chapters 10–27)"],
+      [28, 35, "assyrianCrisis", "Ahaz to Josiah (chapters 28–35)"],
+      [36, 36, "exile", "The fall of Jerusalem and Cyrus's decree (chapter 36)"]
+    ],
+    "Genesis": [
+      [1, 11, "patriarchs", "The primeval history (chapters 1–11), which is not tied to a datable period"],
+      [12, 50, "patriarchs", "The patriarchal narratives (chapters 12–50)"]
+    ],
+    "Acts": [
+      [1, 12, "earlyChurch", "The Jerusalem church and its first expansion (chapters 1–12)"],
+      [13, 28, "earlyChurch", "Paul's missionary journeys and voyage to Rome (chapters 13–28)"]
+    ]
+  };
+
+  // Wikipedia article titles for books whose articles are not named "Book of <name>".
+  APP.data.wikiBookTitles = {
+    "Psalms": "Book of Psalms",
+    "Song of Solomon": "Song of Songs",
+    "1 Samuel": "Books of Samuel", "2 Samuel": "Books of Samuel",
+    "1 Kings": "Books of Kings", "2 Kings": "Books of Kings",
+    "1 Chronicles": "Books of Chronicles", "2 Chronicles": "Books of Chronicles",
+    "Matthew": "Gospel of Matthew", "Mark": "Gospel of Mark", "Luke": "Gospel of Luke", "John": "Gospel of John",
+    "Acts": "Acts of the Apostles",
+    "Romans": "Epistle to the Romans",
+    "1 Corinthians": "First Epistle to the Corinthians", "2 Corinthians": "Second Epistle to the Corinthians",
+    "Galatians": "Epistle to the Galatians", "Ephesians": "Epistle to the Ephesians",
+    "Philippians": "Epistle to the Philippians", "Colossians": "Epistle to the Colossians",
+    "1 Thessalonians": "First Epistle to the Thessalonians", "2 Thessalonians": "Second Epistle to the Thessalonians",
+    "1 Timothy": "First Epistle to Timothy", "2 Timothy": "Second Epistle to Timothy",
+    "Titus": "Epistle to Titus", "Philemon": "Epistle to Philemon", "Hebrews": "Epistle to the Hebrews",
+    "James": "Epistle of James", "1 Peter": "First Epistle of Peter", "2 Peter": "Second Epistle of Peter",
+    "1 John": "First Epistle of John", "2 John": "Second Epistle of John", "3 John": "Third Epistle of John",
+    "Jude": "Epistle of Jude"
+  };
+
   APP.data.aliases = {
     "gen": "Genesis", "ge": "Genesis",
     "exo": "Exodus", "ex": "Exodus",

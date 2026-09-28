@@ -52,15 +52,15 @@
           <input
             id="referenceInput"
             type="text"
-            placeholder="Examples: John 19, Daniel 6, 1 Kings 18:20-39"
+            placeholder="Book, chapter, or verse: Isaiah · Isaiah 41 · Isaiah 41:7"
             autocomplete="off"
           >
 
-          <label for="passageText">Optional passage text</label>
+          <label for="passageText">Optional passage text (your translation)</label>
           <textarea
             id="passageText"
             rows="5"
-            placeholder="Paste the passage text for more passage-specific Ollama analysis."
+            placeholder="Optional. The passage is fetched automatically (World English Bible); paste your own translation here to use it instead."
           ></textarea>
 
           <button id="analyzeButton" class="button button-primary full-width" type="submit">
@@ -197,6 +197,11 @@
             <div id="blufContent" class="narrative-card"></div>
           </section>
 
+          <section id="passageSection" class="result-section hidden">
+            <h3 id="passageTitle">The Passage</h3>
+            <div id="passageContent" class="narrative-card passage-card"></div>
+          </section>
+
           <section class="result-section">
             <h3>Historical Setting</h3>
             <div id="historicalSettingContent" class="narrative-card"></div>
@@ -205,6 +210,12 @@
           <section class="result-section">
             <h3>Original-Setting Context</h3>
             <div id="applicationContent" class="narrative-card"></div>
+          </section>
+
+          <section id="soWhatSection" class="result-section hidden">
+            <h3>So What? Influence and Legacy</h3>
+            <p class="section-description">How this passage shaped its region and later history: first audience, religious traditions, culture, and politics.</p>
+            <div id="soWhatContent" class="narrative-card"></div>
           </section>
 
           <section class="result-section">
@@ -522,6 +533,7 @@
   <script src="js/17-timeline-ai.js"></script>
   <script src="js/18-timeline-view.js"></script>
   <script src="js/19-timeline-controller.js"></script>
+  <script src="js/20-passage.js"></script>
   <script src="js/99-controller.js"></script>
 </body>
 </html>
