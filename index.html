@@ -71,6 +71,7 @@
                 <option value="eng_kjv">King James (KJV)</option>
                 <option value="eng_net">NET Bible</option>
                 <option value="ENGWEBP">World English (WEB)</option>
+                <option value="ESV">ESV (needs free API key)</option>
               </select>
             </div>
             <div>
@@ -83,8 +84,8 @@
             </div>
           </div>
           <p class="field-help">
-            Commentary comes from John Gill (Baptist) and the Tyndale study notes (evangelical); history may come from any
-            source and is labeled.
+            Commentary comes from the Tyndale study notes (evangelical); the Baptist lens guides AI interpretation.
+            History may come from any source and is labeled.
           </p>
 
           <button id="analyzeButton" class="button button-primary full-width" type="submit">
@@ -236,10 +237,10 @@
             <div id="applicationContent" class="narrative-card"></div>
           </section>
 
-          <section id="soWhatSection" class="result-section hidden">
-            <h3>So What? Influence and Legacy</h3>
-            <p class="section-description">How this passage shaped its region and later history: first audience, religious traditions, culture, and politics.</p>
-            <div id="soWhatContent" class="narrative-card"></div>
+          <section id="connectionsSection" class="result-section hidden">
+            <h3>World Connections</h3>
+            <p class="section-description">How the wider world of this era relates to the passage, and how it shaped the beginning and growth of Christianity.</p>
+            <div id="connectionsContent" class="narrative-card"></div>
           </section>
 
           <section class="result-section">
@@ -519,8 +520,19 @@
         <label for="llmApiKey">API key (optional)</label>
         <input id="llmApiKey" type="password" autocomplete="off" spellcheck="false" placeholder="Only for hosted OpenAI-compatible services">
         <p class="field-help">
-          The key is kept in memory for this page only and is never saved. For Ollama opened from a file, set
-          <code>OLLAMA_ORIGINS=*</code> and restart Ollama so the browser is allowed to connect.
+          The key is kept in memory for this page only and is never saved. Ollama only accepts this app when it is
+          opened with <code>Start Bible World Context.bat</code> (served from localhost), not by double-clicking <code>index.html</code>.
+        </p>
+
+        <hr class="divider">
+        <p class="section-label">LICENSED BIBLE TRANSLATIONS (OPTIONAL)</p>
+        <label for="esvApiKey">ESV API key</label>
+        <input id="esvApiKey" type="password" autocomplete="off" spellcheck="false" placeholder="Free for personal use at api.esv.org">
+        <label for="apiBibleKey">API.Bible key (for NIV and others)</label>
+        <input id="apiBibleKey" type="password" autocomplete="off" spellcheck="false" placeholder="Free at scripture.api.bible">
+        <p class="field-help">
+          The ESV and NIV are copyrighted, so they need a key from the publisher's service. Translations your API.Bible key
+          is licensed for (which may include the NIV) are added to the Translation list. Keys are saved in this browser only.
         </p>
 
         <div class="button-row">
@@ -558,6 +570,7 @@
   <script src="js/18-timeline-view.js"></script>
   <script src="js/19-timeline-controller.js"></script>
   <script src="js/20-passage.js"></script>
+  <script src="js/21-growth.js"></script>
   <script src="js/99-controller.js"></script>
 </body>
 </html>
