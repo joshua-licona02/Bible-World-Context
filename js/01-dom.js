@@ -5,6 +5,8 @@
     referenceForm: document.getElementById("referenceForm"),
     referenceInput: document.getElementById("referenceInput"),
     passageText: document.getElementById("passageText"),
+    translationSelect: document.getElementById("translationSelect"),
+    perspectiveSelect: document.getElementById("perspectiveSelect"),
     analyzeButton: document.getElementById("analyzeButton"),
 
     historicalAnchor: document.getElementById("historicalAnchor"),

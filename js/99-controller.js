@@ -16,7 +16,15 @@
     },
 
     loadLlmSettings: function () {
-      var stored = APP.core.readStoredSettings().llm || {};
+      var saved = APP.core.readStoredSettings();
+      if (saved.translation) {
+        APP.dom.translationSelect.value = saved.translation;
+      }
+      if (saved.perspective) {
+        APP.dom.perspectiveSelect.value = saved.perspective;
+      }
+
+      var stored = saved.llm || {};
       var provider = stored.provider === "openai" ? "openai" : "ollama";
 
       APP.dom.llmProvider.value = provider;
@@ -111,6 +119,27 @@
       APP.dom.ollamaEndpoint.addEventListener("change", APP.controller.saveSettings);
       APP.dom.ollamaModel.addEventListener("change", APP.controller.saveSettings);
       APP.dom.llmApiKey.addEventListener("change", APP.controller.saveSettings);
+
+      [APP.dom.translationSelect, APP.dom.perspectiveSelect].forEach(function (select) {
+        select.addEventListener("change", function () {
+          APP.core.writeStoredSettings({
+            translation: APP.dom.translationSelect.value,
+            perspective: APP.dom.perspectiveSelect.value
+          });
+        });
+      });
+
+      // Cross-references and Scripture citations open that passage in a new analysis.
+      APP.dom.resultContent.addEventListener("click", function (event) {
+        var button = event.target.closest("[data-analyze-ref]");
+        if (!button) {
+          return;
+        }
+        APP.dom.referenceInput.value = button.getAttribute("data-analyze-ref");
+        APP.dom.passageText.value = "";
+        APP.dom.referenceForm.requestSubmit();
+        APP.dom.referenceInput.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
       APP.dom.llmProvider.addEventListener("change", APP.controller.handleProviderChange);
       APP.dom.llmRefreshModels.addEventListener("click", APP.controller.handleRefreshModels);
 
@@ -352,7 +381,7 @@
 
       // Passage research (text, verse/chapter/book notes, influence evidence) runs alongside source collection.
       var passage = context.type === "bible"
-        ? APP.passage.gather(context.reference).then(function (packet) {
+        ? APP.passage.gather(context.reference, { translation: APP.dom.translationSelect.value }).then(function (packet) {
           APP.core.addAudit("success", "Passage research gathered for " + context.reference.display + " (" + packet.scope + " scope).");
           return packet;
         }).catch(function (error) {
@@ -408,7 +437,7 @@
 
       APP.controller.setFormMessage("Generating synthesis with " + APP.llm.describe() + "…", "");
 
-      APP.llm.generate(APP.synthesis.buildPrompt(context, sources, packet), { maxTokens: 2600 }).then(function (responseText) {
+      APP.llm.generate(APP.synthesis.buildPrompt(context, sources, packet, APP.dom.perspectiveSelect.value), { maxTokens: 2600 }).then(function (responseText) {
         APP.core.setState({
           analysis: APP.synthesis.parse(responseText, fallback),
           isLoading: false

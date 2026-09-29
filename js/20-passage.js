@@ -2,11 +2,37 @@
   "use strict";
 
   var WIKI_API = "https://en.wikipedia.org/w/api.php";
-  var BIBLE_API = "https://bible-api.com/";
+  var BIBLE_API = "https://bible.helloao.org/api/";
 
   var SKIP_HEADINGS = /^(text|textual witnesses|parashot|see also|references|notes|citations|bibliography|external links|further reading|sources|explanatory notes|footnotes|jewish|christian|historical english)$/i;
   var ABOUT_HEADINGS = /structure|summary|outline|contents|composition|authorship|dating|date|historical (context|background|setting)|background|setting|themes?|theology|purpose|overview|general presentation|genre|audience|places/i;
   var LEGACY_HEADINGS = /influence|interpretation|reception|legacy|uses? in|in (judaism|christianity|islam|the new testament)|liturgy|liturgical|hermeneutics|impact|significance|music|in (art|culture|literature|popular culture)|commemorat|tradition/i;
+  // Articles that merely contain the phrase (TV episode lists, character lists) are not evidence of influence.
+  var TRIVIAL_CITATION = /^list of|episodes|characters|\((tv|television) series\)|\(film\)|\(video game\)|\(disambiguation\)|season \d|\(band\)|wrestl/i;
+
+  // Where each kind of material comes from, shown next to it so readers can weigh it.
+  var SOURCES = {
+    gill: {
+      label: "Baptist commentary",
+      detail: "John Gill, Exposition of the Old and New Testaments (1746–1766). Gill was a Particular Baptist pastor in London."
+    },
+    tyndale: {
+      label: "Evangelical study notes",
+      detail: "Tyndale Open Study Notes (Tyndale House Publishers, CC BY-SA)."
+    },
+    crossref: {
+      label: "Scripture cross-references",
+      detail: "OpenBible.info cross-references, ranked by how often readers connect the passages."
+    },
+    wikipedia: {
+      label: "General reference",
+      detail: "Wikipedia. Secular, community-edited reference; useful for history, but verify interpretive claims."
+    },
+    openalex: {
+      label: "Academic scholarship",
+      detail: "OpenAlex index of published scholarship. Mixed perspectives, including critical views."
+    }
+  };
 
   var esc = function (value) {
     return APP.utils.escapeHtml(value);
@@ -24,7 +50,197 @@
     return (book === "Psalms" ? "Psalm" : book) + " " + chapter;
   }
 
-  // Full article as plain text with "== Heading ==" markers, split into an intro and sections.
+  function bookFromCode(code) {
+    var usfm = APP.data.usfm;
+    return Object.keys(usfm).filter(function (name) {
+      return usfm[name] === code;
+    })[0] || code;
+  }
+
+  function clean(text) {
+    // Only trailing spaces are trimmed: blank lines mark section breaks in the Tyndale introductions.
+    return APP.utils.fixMojibake(text).replace(/¶\s*/g, "").replace(/[ \t]+\n/g, "\n").trim();
+  }
+
+  function settle(promise) {
+    return promise.catch(function (error) {
+      if (APP.http.isAbort(error)) {
+        throw error;
+      }
+      return null;
+    });
+  }
+
+  // ---------- Free Use Bible API: translations, commentaries, cross-references ----------
+
+  function flattenContent(content) {
+    return (content || []).map(function (part) {
+      if (typeof part === "string") {
+        return part;
+      }
+      if (part && part.text) {
+        return part.text;
+      }
+      if (part && part.heading) {
+        return part.heading;
+      }
+      return part && part.lineBreak ? "\n" : "";
+    }).join(" ").replace(/ *\n */g, "\n").replace(/[ \t]+/g, " ");
+  }
+
+  function fetchChapter(translation, code, chapter, signal) {
+    return APP.http.getJson(BIBLE_API + translation + "/" + code + "/" + chapter + ".json", { signal: signal }).then(function (data) {
+      var items = [];
+      (data.chapter.content || []).forEach(function (item) {
+        if (item.type === "heading") {
+          items.push({ type: "heading", text: clean(flattenContent(item.content)) });
+        } else if (item.type === "verse") {
+          items.push({ type: "verse", verse: item.number, text: clean(flattenContent(item.content)).replace(/\n/g, " ") });
+        }
+      });
+      return { translation: data.translation.name, items: items };
+    });
+  }
+
+  // Commentary chapter as { verseNumber: "comment" }.
+  function fetchCommentary(id, code, chapter, signal) {
+    return APP.http.getJson(BIBLE_API + "c/" + id + "/" + code + "/" + chapter + ".json", { signal: signal }).then(function (data) {
+      var verses = {};
+      (data.chapter.content || []).forEach(function (item) {
+        if (item.type === "verse") {
+          verses[item.number] = (item.content || []).map(clean).filter(Boolean);
+        }
+      });
+      return { introduction: clean(data.chapter.introduction || ""), verses: verses };
+    });
+  }
+
+  // Tyndale book introductions come as one file; headings are short title lines between blank lines.
+  function fetchTyndaleIntro(code, signal) {
+    return APP.http.getJson(BIBLE_API + "c/tyndale/books.json", { signal: signal }).then(function (data) {
+      var book = (data.books || []).filter(function (item) {
+        return item.id === code;
+      })[0];
+      if (!book || !book.introduction) {
+        return null;
+      }
+
+      var parts = clean(book.introduction).split(/\n\n([A-Z][A-Za-z ,'’\-]{2,40})\n\n/);
+      var sections = [];
+      for (var index = 1; index < parts.length; index += 2) {
+        sections.push({ heading: parts[index], text: String(parts[index + 1] || "").trim() });
+      }
+      return { intro: parts[0].trim(), sections: sections };
+    });
+  }
+
+  function tyndaleSection(intro, pattern) {
+    if (!intro) {
+      return null;
+    }
+    return intro.sections.filter(function (section) {
+      return pattern.test(section.heading);
+    })[0] || null;
+  }
+
+  function fetchCrossRefs(code, chapter, start, end, signal) {
+    return APP.http.getJson(BIBLE_API + "d/open-cross-ref/" + code + "/" + chapter + ".json", { signal: signal }).then(function (data) {
+      var totals = {};
+      (data.chapter.content || []).forEach(function (item) {
+        if (start && (item.verse < start || item.verse > end)) {
+          return;
+        }
+        (item.references || []).forEach(function (ref) {
+          if (ref.book === code && ref.chapter === chapter) {
+            return;
+          }
+          var key = ref.book + " " + ref.chapter + ":" + ref.verse + (ref.endVerse ? "-" + ref.endVerse : "");
+          if (!totals[key]) {
+            totals[key] = { book: ref.book, chapter: ref.chapter, verse: ref.verse, endVerse: ref.endVerse || ref.verse, score: 0 };
+          }
+          totals[key].score += ref.score || 0;
+        });
+      });
+
+      return Object.keys(totals).map(function (key) {
+        return totals[key];
+      }).sort(function (a, b) {
+        return b.score - a.score;
+      }).slice(0, 10);
+    });
+  }
+
+  // Fills in the text of cross-references, reading each referenced chapter once.
+  function attachRefText(refs, translation, signal) {
+    var chapters = {};
+    refs.forEach(function (ref) {
+      chapters[ref.book + "/" + ref.chapter] = true;
+    });
+
+    return Promise.all(Object.keys(chapters).slice(0, 10).map(function (key) {
+      var parts = key.split("/");
+      return fetchChapter(translation, parts[0], Number(parts[1]), signal).then(function (text) {
+        chapters[key] = text;
+      }).catch(function (error) {
+        if (APP.http.isAbort(error)) {
+          throw error;
+        }
+        chapters[key] = null;
+      });
+    })).then(function () {
+      return refs.map(function (ref) {
+        var chapterText = chapters[ref.book + "/" + ref.chapter];
+        var name = bookFromCode(ref.book);
+        return {
+          reference: name + " " + ref.chapter + ":" + ref.verse + (ref.endVerse !== ref.verse ? "-" + ref.endVerse : ""),
+          text: chapterText && chapterText.items ? chapterText.items.filter(function (item) {
+            return item.type === "verse" && item.verse >= ref.verse && item.verse <= ref.endVerse;
+          }).map(function (item) {
+            return item.text;
+          }).join(" ") : "",
+          score: ref.score
+        };
+      });
+    });
+  }
+
+  // Tyndale notes begin with their own range ("41:5-7 This taunt…"); keep the ones touching the focus verses.
+  function tyndaleNotes(commentary, chapter, start, end) {
+    if (!commentary) {
+      return [];
+    }
+    var notes = [];
+    Object.keys(commentary.verses).forEach(function (verse) {
+      commentary.verses[verse].forEach(function (note) {
+        // Ranges may run within the chapter ("41:5-7") or past it ("6:1–16:21", covering the rest of the chapter).
+        var match = note.match(/^(\d+):(\d+)(?:[-–](\d+)(?::(\d+))?)?\s+/);
+        var first = match ? Number(match[2]) : Number(verse);
+        var last = match && match[4] ? 999 : match && match[3] ? Number(match[3]) : first;
+        if (!start || (first <= end && last >= start)) {
+          notes.push({ range: match ? match[0].trim() : chapter + ":" + verse, first: first, last: last, text: match ? note.slice(match[0].length) : note });
+        }
+      });
+    });
+    return notes.sort(function (a, b) {
+      return a.first - b.first || (b.last - b.first) - (a.last - a.first);
+    });
+  }
+
+  function gillComments(commentary, start, end) {
+    if (!commentary) {
+      return [];
+    }
+    return Object.keys(commentary.verses).map(Number).filter(function (verse) {
+      return !start || (verse >= start && verse <= end);
+    }).sort(function (a, b) {
+      return a - b;
+    }).map(function (verse) {
+      return { verse: verse, text: commentary.verses[verse].join("\n\n") };
+    });
+  }
+
+  // ---------- Wikipedia: general reference ----------
+
   function fetchArticle(title, signal) {
     return APP.http.getJson(APP.http.buildUrl(WIKI_API, {
       action: "query",
@@ -72,37 +288,23 @@
     });
   }
 
-  // "Isaiah 41:4-10" style passages from bible-api.com (World English Bible, public domain).
-  function fetchPassage(query, signal) {
-    return APP.http.getJson(BIBLE_API + encodeURIComponent(query).replace(/%20/g, "+") + "?translation=web", {
-      signal: signal,
-      retries: 1
-    }).then(function (data) {
-      return {
-        reference: data.reference,
-        translation: data.translation_name || "World English Bible",
-        verses: (data.verses || []).map(function (verse) {
-          return { chapter: verse.chapter, verse: verse.verse, text: String(verse.text || "").replace(/\s+/g, " ").trim() };
-        })
-      };
-    });
-  }
-
-  // Articles that quote the passage: hymns, cantatas, mottos, place names, and so on.
+  // Articles that quote the passage (hymns, cantatas, place names), minus trivial list/TV pages.
   function fetchCitations(phrase, signal) {
     return APP.http.getJson(APP.http.buildUrl(WIKI_API, {
       action: "query",
       format: "json",
       origin: "*",
       list: "search",
-      srlimit: 12,
+      srlimit: 25,
       srsearch: "\"" + phrase + "\""
     }), { signal: signal }).then(function (data) {
       var query = data.query || {};
       return {
         phrase: phrase,
         total: query.searchinfo ? query.searchinfo.totalhits : 0,
-        items: (query.search || []).map(function (item) {
+        items: (query.search || []).filter(function (item) {
+          return !TRIVIAL_CITATION.test(item.title) && item.title !== phrase;
+        }).slice(0, 10).map(function (item) {
           return {
             title: item.title,
             snippet: String(item.snippet || "").replace(/<[^>]+>/g, "").replace(/&quot;/g, "\"").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim(),
@@ -113,35 +315,16 @@
     });
   }
 
-  // Parses "(1:16–8:39)", "(5–11)", "chapters 40–55" into a chapter span.
-  function chapterSpan(text) {
-    var match = String(text).match(/\(?\b(?:chapters?\s+)?(\d{1,3})(?::\d+)?\s*[–-]\s*(\d{1,3})(?::\d+)?\)?/i);
-    if (!match) {
-      return null;
-    }
-    var first = Number(match[1]);
-    var second = Number(match[2]);
-    return second >= first ? { start: first, end: second } : { start: first, end: first };
-  }
-
   function sentences(text) {
     return String(text).split(/(?<=[.!?])\s+(?=[A-Z"“(])/);
   }
 
-  // Where a chapter sits in the book: outline headings covering it, plus sentences naming a covering range.
   function placement(bookArticle, chapter) {
     if (!bookArticle) {
       return [];
     }
 
     var found = [];
-    bookArticle.sections.forEach(function (section) {
-      var span = chapterSpan(section.heading);
-      if (span && chapter >= span.start && chapter <= span.end && span.end - span.start < 60) {
-        found.push({ heading: section.heading, text: APP.utils.truncate(section.text, 600) });
-      }
-    });
-
     bookArticle.sections.concat([{ heading: "Introduction", text: bookArticle.intro }]).forEach(function (section) {
       if (!ABOUT_HEADINGS.test(section.heading) && section.heading !== "Introduction") {
         return;
@@ -150,15 +333,14 @@
         var pattern = /chapters?\s+(\d{1,3})\s*[–-]\s*(\d{1,3})/gi;
         var match;
         while ((match = pattern.exec(sentence))) {
-          if (chapter >= Number(match[1]) && chapter <= Number(match[2]) && found.length < 6 &&
+          if (chapter >= Number(match[1]) && chapter <= Number(match[2]) && found.length < 4 &&
             !found.some(function (item) { return item.text === sentence; })) {
             found.push({ heading: section.heading, text: sentence });
           }
         }
       });
     });
-
-    return found.slice(0, 6);
+    return found;
   }
 
   function verseNotes(chapterArticle, start, end) {
@@ -182,7 +364,6 @@
     if (!article) {
       return [];
     }
-    // Subsections inherit legacy status from their parent ("Later interpretation and influence" > "Christianity").
     return article.sections.filter(function (section) {
       return section.text.length > 60 && [section.heading].concat(section.parents).some(function (heading) {
         return LEGACY_HEADINGS.test(heading);
@@ -194,26 +375,6 @@
     });
   }
 
-  function aboutSections(article) {
-    if (!article) {
-      return [];
-    }
-    return article.sections.filter(function (section) {
-      var heads = [section.heading].concat(section.parents);
-      return section.text.length > 60 && !/^verses?\s+\d/i.test(section.heading) &&
-        heads.some(function (heading) { return ABOUT_HEADINGS.test(heading); }) &&
-        !heads.some(function (heading) { return LEGACY_HEADINGS.test(heading); });
-    }).map(function (section) {
-      var parent = section.parents[section.parents.length - 1];
-      return {
-        heading: parent && !ABOUT_HEADINGS.test(section.heading) ? parent + ": " + section.heading : section.heading,
-        text: section.text
-      };
-    });
-  }
-
-  // Exact-phrase OpenAlex queries for the chapter and the book's reception. Works are kept only when the
-  // title names the book, since abstracts mentioning a common name ("John") admit unrelated papers.
   function scholarship(book, chapterName, signal) {
     var stem = book.replace(/^\d\s+/, "").split(" ").pop().replace(/s$/, "");
     var mentions = new RegExp("\\b" + stem, "i");
@@ -239,76 +400,128 @@
     });
   }
 
-  function settle(promise) {
-    return promise.catch(function (error) {
-      if (APP.http.isAbort(error)) {
-        throw error;
+  // ---------- Further study (external, link-only) ----------
+
+  function studyLinks(packet) {
+    var slug = packet.book === "Song of Solomon" ? "songs" : packet.book.toLowerCase().replace(/ /g, "_");
+    var chapter = packet.chapter || 1;
+    var links = [
+      {
+        label: "John Gill's full exposition of " + (packet.chapter ? packet.book + " " + chapter : packet.book + " 1"),
+        note: "Baptist · BibleHub",
+        url: "https://biblehub.com/commentaries/gill/" + slug + "/" + chapter + ".htm"
       }
-      return null;
+    ];
+
+    if (packet.scope === "verse") {
+      links.push({
+        label: "Classic commentaries on " + packet.display,
+        note: "Gill, Barnes, Spurgeon (Psalms), and others · BibleHub",
+        url: "https://biblehub.com/commentaries/" + slug + "/" + chapter + "-" + packet.verseStart + ".htm"
+      });
+    }
+
+    links.push({
+      label: "Spurgeon's sermons on " + packet.display,
+      note: "Baptist · Spurgeon Center, Midwestern Baptist Theological Seminary",
+      url: "https://www.spurgeon.org/?s=" + encodeURIComponent(packet.display)
     });
+    links.push({
+      label: "The Baptist Faith and Message (2000)",
+      note: "Southern Baptist Convention statement of faith, for doctrinal framing",
+      url: "https://bfm.sbc.net/bfm2000/"
+    });
+
+    return links;
   }
 
+  // ---------- Gathering ----------
+
   APP.passage = {
-    gather: function (reference, signal) {
+    sources: SOURCES,
+
+    gather: function (reference, options, signal) {
+      options = options || {};
+      var translation = options.translation || "BSB";
       var scope = APP.model.scopeOf(reference);
       var book = reference.book.name;
+      var code = APP.data.usfm[book];
       var chapter = reference.chapter;
       var start = reference.verseStart;
       var end = reference.verseEnd || start;
       var chapterName = chapter ? chapterTitle(book, chapter) : "";
-      var passageQuery = scope === "verse"
-        ? book + " " + chapter + ":" + Math.max(1, start - 3) + "-" + (end + 3)
-        : scope === "chapter" ? book + " " + chapter : "";
       var citationPhrase = scope === "verse"
         ? chapterName + ":" + start + (end !== start ? "-" + end : "")
         : scope === "chapter" ? chapterName : "";
 
-      // Passages that run past the chapter end make the context request fail; fall back to the exact verses.
-      var passage = passageQuery
-        ? fetchPassage(passageQuery, signal).catch(function (error) {
-          if (APP.http.isAbort(error) || scope !== "verse") {
-            throw error;
-          }
-          return fetchPassage(book + " " + chapter + ":" + start + (end !== start ? "-" + end : ""), signal);
-        })
+      var crossRefs = scope !== "book"
+        ? settle(fetchCrossRefs(code, chapter, scope === "verse" ? start : 0, end, signal).then(function (refs) {
+          return attachRefText(refs.slice(0, scope === "verse" ? 8 : 10), translation, signal);
+        }))
         : Promise.resolve(null);
 
       return Promise.all([
+        scope !== "book" ? settle(fetchChapter(translation, code, chapter, signal)) : Promise.resolve(null),
+        scope !== "book" ? settle(fetchCommentary("john-gill", code, chapter, signal)) : Promise.resolve(null),
+        scope !== "book" ? settle(fetchCommentary("tyndale", code, chapter, signal)) : Promise.resolve(null),
+        settle(fetchTyndaleIntro(code, signal)),
+        crossRefs,
         settle(fetchArticle(bookTitle(book), signal)),
         scope !== "book" ? settle(fetchArticle(chapterName, signal)) : Promise.resolve(null),
-        settle(passage),
         citationPhrase ? settle(fetchCitations(citationPhrase, signal)) : Promise.resolve(null),
         settle(scholarship(book, scope === "book" ? "" : chapterName, signal))
       ]).then(function (results) {
-        var bookArticle = results[0];
-        var chapterArticle = results[1];
-        var text = results[2];
+        var text = results[0];
+        var passage = null;
 
         if (text) {
-          text.verses.forEach(function (verse) {
-            verse.focus = scope !== "verse" || (verse.chapter === chapter && verse.verse >= start && verse.verse <= end);
-          });
+          var contextRange = scope === "verse" ? { first: Math.max(1, start - 3), last: end + 3 } : null;
+          passage = {
+            translation: text.translation,
+            items: text.items.filter(function (item) {
+              if (!contextRange) {
+                return true;
+              }
+              return item.type === "verse" && item.verse >= contextRange.first && item.verse <= contextRange.last;
+            }).map(function (item) {
+              item.focus = item.type === "verse" && (scope !== "verse" || (item.verse >= start && item.verse <= end));
+              return item;
+            })
+          };
         }
 
-        return {
+        var tyndaleIntro = results[3];
+        var bookArticle = results[5];
+        var chapterArticle = results[6];
+        var packet = {
           scope: scope,
           display: reference.display,
           book: book,
           chapter: chapter,
           verseStart: start,
           verseEnd: end,
-          passage: text,
+          translation: translation,
+          passage: passage,
+          gill: gillComments(results[1], scope === "verse" ? start : 0, end),
+          gillIntro: results[1] ? results[1].introduction : "",
+          notes: tyndaleNotes(results[2], chapter, scope === "verse" ? start : 0, end),
+          tyndaleIntro: tyndaleIntro,
+          setting: tyndaleSection(tyndaleIntro, /^setting$/i),
+          message: tyndaleSection(tyndaleIntro, /meaning and message|message/i),
+          interpreting: tyndaleSection(tyndaleIntro, /^interpreting/i),
+          crossRefs: results[4] || [],
           bookArticle: bookArticle,
           bookAbout: aboutSections(bookArticle),
           chapterArticle: chapterArticle,
-          chapterAbout: aboutSections(chapterArticle),
           placement: scope !== "book" ? placement(bookArticle, chapter) : [],
           verseNotes: scope === "verse" ? verseNotes(chapterArticle, start, end) : [],
           legacy: legacySections(scope === "book" ? bookArticle : chapterArticle)
             .concat(scope === "book" ? [] : legacySections(bookArticle).slice(0, 2)),
-          citations: results[3],
-          works: results[4] || []
+          citations: results[7],
+          works: results[8] || []
         };
+        packet.links = studyLinks(packet);
+        return packet;
       });
     },
 
@@ -316,97 +529,330 @@
       if (!packet || !packet.passage) {
         return "";
       }
-      return packet.passage.verses.filter(function (verse) {
-        return verse.focus;
-      }).map(function (verse) {
-        return verse.verse + " " + verse.text;
+      return packet.passage.items.filter(function (item) {
+        return item.type === "verse" && item.focus;
+      }).map(function (item) {
+        return item.verse + " " + item.text;
       }).join(" ");
     },
 
-    // Condensed scope-specific material for the model prompt.
+    firstSentences: function (text, count) {
+      return sentences(String(text || "").replace(/\s+/g, " ")).slice(0, count || 2).join(" ");
+    },
+
+    // Condensed material for the model prompt, grouped and labeled by source perspective.
     promptMaterial: function (packet) {
       if (!packet) {
-        return { notes: "[Passage research unavailable.]", reception: "[None collected.]" };
+        return { commentary: "[Unavailable.]", reference: "[Unavailable.]", scripture: "[Unavailable.]", reception: "[Unavailable.]" };
       }
 
-      var notes = [];
-      var add = function (label, text, limit) {
-        if (text) {
-          notes.push(label + ": " + APP.utils.truncate(text, limit));
-        }
-      };
+      var truncate = APP.utils.truncate;
+      var commentary = [];
+      var scopeLimit = packet.scope === "verse" ? 1800 : 900;
 
-      if (packet.scope === "verse") {
-        packet.verseNotes.forEach(function (note) { add("Encyclopedia note (" + note.heading + ")", note.text, 900); });
-        add("Chapter overview", packet.chapterArticle && packet.chapterArticle.intro, 700);
-        packet.placement.slice(0, 2).forEach(function (item) { add("Place in the book (" + item.heading + ")", item.text, 400); });
-      } else if (packet.scope === "chapter") {
-        add("Chapter overview", packet.chapterArticle && packet.chapterArticle.intro, 1200);
-        packet.chapterAbout.slice(0, 3).forEach(function (item) { add("Chapter " + item.heading, item.text, 600); });
-        packet.placement.slice(0, 3).forEach(function (item) { add("Place in the book (" + item.heading + ")", item.text, 400); });
-      } else {
-        add("Book overview", packet.bookArticle && packet.bookArticle.intro, 1200);
-        packet.bookAbout.slice(0, 5).forEach(function (item) { add(item.heading, item.text, 700); });
+      packet.notes.slice(0, packet.scope === "verse" ? 6 : 10).forEach(function (note) {
+        commentary.push("[Tyndale study note " + note.range + "] " + truncate(note.text, 500));
+      });
+      packet.gill.slice(0, packet.scope === "verse" ? 3 : 4).forEach(function (comment) {
+        commentary.push("[John Gill, Baptist, on verse " + comment.verse + "] " + truncate(comment.text, scopeLimit));
+      });
+      if (packet.setting) {
+        commentary.push("[Tyndale book introduction: Setting] " + truncate(packet.setting.text, 900));
+      }
+      if (packet.interpreting) {
+        commentary.push("[Tyndale book introduction: " + packet.interpreting.heading + "] " + truncate(packet.interpreting.text, 900));
+      }
+      if (packet.message) {
+        commentary.push("[Tyndale book introduction: Meaning and Message] " + truncate(packet.message.text, 900));
+      }
+      if (packet.scope === "book" && packet.tyndaleIntro) {
+        packet.tyndaleIntro.sections.filter(function (section) {
+          return /authorship|author|date/i.test(section.heading);
+        }).forEach(function (section) {
+          commentary.push("[Tyndale book introduction: " + section.heading + "] " + truncate(section.text, 700));
+        });
       }
 
-      var reception = packet.legacy.slice(0, 4).map(function (item) {
-        return "- " + item.source + " — " + item.heading + ": " + APP.utils.truncate(item.text, 700);
+      var reference = [];
+      packet.verseNotes.forEach(function (note) {
+        reference.push("[Wikipedia, " + note.heading + "] " + truncate(note.text, 500));
+      });
+      if (packet.chapterArticle) {
+        reference.push("[Wikipedia chapter overview] " + truncate(packet.chapterArticle.intro, 500));
+      }
+      if (packet.scope === "book" && packet.bookArticle) {
+        reference.push("[Wikipedia book overview] " + truncate(packet.bookArticle.intro, 600));
+      }
+
+      var scripture = packet.crossRefs.slice(0, 8).map(function (ref) {
+        return "- " + ref.reference + (ref.text ? ": " + truncate(ref.text, 220) : "");
+      });
+
+      var reception = packet.legacy.slice(0, 3).map(function (item) {
+        return "- [Wikipedia] " + item.heading + ": " + truncate(item.text, 500);
       });
       if (packet.citations && packet.citations.items.length) {
-        reception.push("- Quoted or referenced in " + packet.citations.total + " encyclopedia articles, including: " +
-          packet.citations.items.filter(function (item) {
-            return !packet.chapterArticle || item.title !== packet.chapterArticle.title;
-          }).slice(0, 10).map(function (item) { return item.title; }).join("; ") + ".");
+        reception.push("- Works that quote or reference the passage: " + packet.citations.items.map(function (item) {
+          return item.title;
+        }).join("; ") + ".");
       }
       packet.works.slice(0, 5).forEach(function (work) {
-        reception.push("- Scholarship: " + work.title + (work.meta ? " (" + work.meta + ")" : ""));
+        reception.push("- [Scholarship] " + work.title + (work.meta ? " (" + work.meta + ")" : ""));
       });
 
       return {
-        notes: notes.join("\n") || "[No encyclopedia notes found for this passage.]",
+        commentary: commentary.join("\n") || "[No commentary found.]",
+        reference: reference.join("\n") || "[No general-reference notes found.]",
+        scripture: scripture.join("\n") || "[No cross-references found.]",
         reception: reception.join("\n") || "[No reception evidence collected.]"
       };
     }
   };
 
+  function aboutSections(article) {
+    if (!article) {
+      return [];
+    }
+    return article.sections.filter(function (section) {
+      var heads = [section.heading].concat(section.parents);
+      return section.text.length > 60 && !/^verses?\s+\d/i.test(section.heading) &&
+        heads.some(function (heading) { return ABOUT_HEADINGS.test(heading); }) &&
+        !heads.some(function (heading) { return LEGACY_HEADINGS.test(heading); });
+    }).map(function (section) {
+      var parent = section.parents[section.parents.length - 1];
+      return {
+        heading: parent && !ABOUT_HEADINGS.test(section.heading) ? parent + ": " + section.heading : section.heading,
+        text: section.text
+      };
+    });
+  }
+
   // ---------- Rendering ----------
 
   var SCOPE_LABELS = {
-    verse: "Verse focus: the words themselves, their immediate context, and notes on this verse.",
-    chapter: "Chapter focus: the full chapter, its structure, and where it sits in the book.",
-    book: "Book focus: authorship, date, structure, and major themes of the whole book."
+    verse: "Verse focus: the words themselves, their immediate context, and commentary on this verse.",
+    chapter: "Chapter focus: the full chapter, its movement and structure, and where it sits in the book.",
+    book: "Book focus: setting, authorship, date, structure, and message of the whole book."
   };
 
-  function details(title, text, open) {
-    return '<details class="passage-details"' + (open ? " open" : "") + "><summary>" + esc(title) + "</summary>" +
-      APP.utils.textToParagraphs(APP.utils.truncate(text, 2400)) + "</details>";
+  function badge(key) {
+    var source = SOURCES[key];
+    return '<span class="source-badge source-' + key + '" title="' + esc(source.detail) + '">' + esc(source.label) + "</span>";
   }
 
-  function sourceLink(article) {
-    return article
-      ? '<a class="source-link" href="' + esc(article.url) + '" target="_blank" rel="noopener noreferrer">' + esc(article.title) + " (Wikipedia)</a>"
-      : "";
+  function paragraphs(text, limit) {
+    return APP.utils.textToParagraphs(APP.utils.truncate(text, limit || 2400));
+  }
+
+  function details(title, body, open, sourceKey) {
+    return '<details class="passage-details"' + (open ? " open" : "") + "><summary>" + esc(title) +
+      (sourceKey ? " " + badge(sourceKey) : "") + "</summary>" + body + "</details>";
+  }
+
+  function sourceNote(key) {
+    return '<p class="source-note">' + esc(SOURCES[key].detail) + "</p>";
   }
 
   function passageHtml(packet) {
-    if (!packet.passage || !packet.passage.verses.length) {
-      return "";
+    if (!packet.passage || !packet.passage.items.length) {
+      return '<p class="field-help">The passage text could not be loaded.</p>';
     }
 
-    var verses = packet.passage.verses;
-    var body = verses.map(function (verse) {
-      return '<span class="verse' + (verse.focus ? " verse-focus" : "") + '"><sup>' + verse.verse + "</sup>" + esc(verse.text) + "</span>";
+    var body = packet.passage.items.map(function (item) {
+      if (item.type === "heading") {
+        return '<span class="passage-heading">' + esc(item.text) + "</span>";
+      }
+      return '<span class="verse' + (item.focus ? " verse-focus" : "") + '"><sup>' + item.verse + "</sup>" + esc(item.text) + "</span>";
     }).join(" ");
 
     return '<blockquote class="passage-text' + (packet.scope === "chapter" ? " passage-chapter" : "") + '">' + body + "</blockquote>" +
-      '<p class="field-help">' + esc(packet.passage.translation) + " (public domain), via bible-api.com" +
-      (packet.scope === "verse" && verses.some(function (verse) { return !verse.focus; })
-        ? ". Surrounding verses are shown dimmed for context." : ".") + "</p>";
+      '<p class="field-help">' + esc(packet.passage.translation) + ", via the Free Use Bible API" +
+      (packet.scope === "verse" ? ". Surrounding verses are dimmed for context." : ".") + "</p>";
+  }
+
+  function notesHtml(notes, limit) {
+    return '<ul class="note-list">' + notes.slice(0, limit).map(function (note) {
+      return "<li><strong>" + esc(note.range) + "</strong> " + esc(note.text) + "</li>";
+    }).join("") + "</ul>";
+  }
+
+  function gillHtml(comments, limit, perComment) {
+    return comments.slice(0, limit).map(function (comment) {
+      return '<div class="gill-comment"><strong>Verse ' + comment.verse + ".</strong>" + paragraphs(comment.text, perComment) + "</div>";
+    }).join("");
+  }
+
+  function linksHtml(links) {
+    return '<ul class="evidence-list">' + links.map(function (link) {
+      return '<li><a class="source-link" href="' + esc(link.url) + '" target="_blank" rel="noopener noreferrer">' + esc(link.label) + "</a>" +
+        ' <span class="muted">— ' + esc(link.note) + "</span></li>";
+    }).join("") + "</ul>";
+  }
+
+  function refsHtml(refs) {
+    return '<ul class="crossref-list">' + refs.map(function (ref) {
+      return '<li><button type="button" class="link-button" data-analyze-ref="' + esc(ref.reference) + '" title="Analyze this passage">' +
+        esc(ref.reference) + "</button>" + (ref.text ? ' <span class="crossref-text">' + esc(APP.utils.truncate(ref.text, 240)) + "</span>" : "") + "</li>";
+    }).join("") + "</ul>";
+  }
+
+  function wikipediaHtml(packet) {
+    var parts = [];
+    if (packet.scope === "verse" && packet.verseNotes.length) {
+      packet.verseNotes.forEach(function (note) {
+        parts.push("<h5>" + esc(note.heading) + "</h5>" + paragraphs(note.text, 1200));
+      });
+    }
+    if (packet.scope !== "book" && packet.chapterArticle) {
+      parts.push("<h5>Chapter overview</h5>" + paragraphs(packet.chapterArticle.intro, 1200));
+    }
+    if (packet.placement.length) {
+      parts.push("<h5>Place in the book</h5><ul class=\"evidence-list\">" + packet.placement.map(function (item) {
+        return "<li>" + esc(APP.utils.truncate(item.text, 320)) + "</li>";
+      }).join("") + "</ul>");
+    }
+    if (packet.scope === "book") {
+      if (packet.bookArticle) {
+        parts.push("<h5>Overview</h5>" + paragraphs(packet.bookArticle.intro, 1200));
+      }
+      packet.bookAbout.slice(0, 5).forEach(function (item) {
+        parts.push("<h5>" + esc(item.heading) + "</h5>" + paragraphs(item.text, 900));
+      });
+    }
+    var article = packet.scope === "book" ? packet.bookArticle : packet.chapterArticle || packet.bookArticle;
+    if (article) {
+      parts.push('<p class="field-help"><a class="source-link" href="' + esc(article.url) + '" target="_blank" rel="noopener noreferrer">' +
+        esc(article.title) + " on Wikipedia</a></p>");
+    }
+    return parts.join("");
   }
 
   APP.passageView = {
-    // Links names in model output that match collected evidence (quoting articles, influence sections,
-    // scholarship), so backed examples are distinguishable from the model's general knowledge.
+    buildFocus: function (packet, context) {
+      if (!packet) {
+        return '<div class="narrative-card"><p>Passage research was unavailable. Check your connection and try again.</p></div>';
+      }
+
+      var parts = [
+        '<div class="scope-row"><span class="scope-pill scope-' + packet.scope + '">' + packet.scope.toUpperCase() + "</span>" +
+          '<span class="field-help">' + esc(SCOPE_LABELS[packet.scope]) + "</span></div>"
+      ];
+
+      if (context && context.bookSection) {
+        parts.push('<p class="scope-note">' + esc(context.bookSection) + (packet.scope === "book"
+          ? ". The era shown reflects the opening section; search a chapter for its own period."
+          : ". The historical era shown reflects this section.") + "</p>");
+      }
+
+      if (packet.scope !== "book") {
+        parts.push(passageHtml(packet));
+      }
+
+      if (packet.scope === "verse") {
+        if (packet.notes.length) {
+          parts.push(details("Study notes on " + packet.display, notesHtml(packet.notes, 8) + sourceNote("tyndale"), true, "tyndale"));
+        }
+        if (packet.gill.length) {
+          parts.push(details("Commentary on " + packet.display, gillHtml(packet.gill, 4, 3000) + sourceNote("gill"), true, "gill"));
+        }
+      }
+
+      if (packet.scope === "chapter") {
+        if (packet.notes.length) {
+          parts.push(details("Study notes through " + packet.display, notesHtml(packet.notes, 40) + sourceNote("tyndale"), true, "tyndale"));
+        }
+        if (packet.gill.length) {
+          parts.push(details("Verse-by-verse commentary on " + packet.display, (packet.gillIntro ? paragraphs(packet.gillIntro, 1500) : "") +
+            gillHtml(packet.gill, 60, 900) + sourceNote("gill"), false, "gill"));
+        }
+      }
+
+      if (packet.tyndaleIntro) {
+        var introParts = [];
+        if (packet.scope === "book") {
+          introParts.push(paragraphs(packet.tyndaleIntro.intro, 1500));
+          packet.tyndaleIntro.sections.forEach(function (section, index) {
+            introParts.push(details(section.heading, paragraphs(section.text, 3500), index === 0));
+          });
+        } else {
+          [packet.setting, packet.interpreting].filter(Boolean).forEach(function (section) {
+            introParts.push("<h5>" + esc(section.heading) + "</h5>" + paragraphs(section.text, 1600));
+          });
+        }
+        if (introParts.length) {
+          parts.push(details(packet.scope === "book" ? "Introduction to " + packet.book : "The book's setting",
+            introParts.join("") + sourceNote("tyndale"), packet.scope === "book", "tyndale"));
+        }
+      }
+
+      var wiki = wikipediaHtml(packet);
+      if (wiki) {
+        parts.push(details("Historical background (general reference)", wiki + sourceNote("wikipedia"), false, "wikipedia"));
+      }
+
+      parts.push('<div class="passage-block"><h4>Further study</h4>' + linksHtml(packet.links) + "</div>");
+      return parts.join("");
+    },
+
+    buildSoWhat: function (packet, analysisText, fromModel) {
+      var parts = [];
+
+      if (analysisText) {
+        parts.push('<div class="ai-output">' + (fromModel ? APP.utils.renderMarkdown(analysisText) : APP.utils.textToParagraphs(analysisText)) + "</div>");
+      }
+
+      if (!packet) {
+        return parts.join("");
+      }
+
+      var evidence = [];
+
+      if (packet.crossRefs.length) {
+        evidence.push('<div class="passage-block"><h4>Echoes through Scripture ' + badge("crossref") + "</h4>" +
+          '<p class="field-help">Passages most often connected to ' + esc(packet.display) + ". Select one to study it.</p>" +
+          refsHtml(packet.crossRefs) + "</div>");
+      }
+
+      if (packet.message) {
+        evidence.push('<div class="passage-block"><h4>The book\'s message ' + badge("tyndale") + "</h4>" +
+          paragraphs(packet.message.text, 1400) + "</div>");
+      }
+
+      if (packet.citations && packet.citations.items.length) {
+        evidence.push('<div class="passage-block"><h4>Cultural footprint ' + badge("wikipedia") + "</h4>" +
+          '<p class="field-help">Hymns, music, art, and places that quote or reference "' + esc(packet.citations.phrase) +
+          '" (list pages and TV listings excluded).</p><ul class="evidence-list">' +
+          packet.citations.items.slice(0, 8).map(function (item) {
+            return '<li><a class="source-link" href="' + esc(item.url) + '" target="_blank" rel="noopener noreferrer">' + esc(item.title) + "</a>" +
+              (item.snippet ? ' <span class="muted">— ' + esc(APP.utils.truncate(item.snippet, 140)) + "</span>" : "") + "</li>";
+          }).join("") + "</ul></div>");
+      }
+
+      if (packet.legacy.length) {
+        evidence.push('<div class="passage-block"><h4>Interpretation history ' + badge("wikipedia") + "</h4>" +
+          packet.legacy.slice(0, 4).map(function (item) {
+            return details(item.heading + " — " + item.source, paragraphs(item.text, 1800), false);
+          }).join("") + "</div>");
+      }
+
+      if (packet.works.length) {
+        evidence.push('<div class="passage-block"><h4>Scholarship ' + badge("openalex") + '</h4><ul class="evidence-list">' +
+          packet.works.map(function (work) {
+            var url = APP.utils.safeUrl(work.url);
+            return "<li>" + (url ? '<a class="source-link" href="' + esc(url) + '" target="_blank" rel="noopener noreferrer">' + esc(work.title) + "</a>" : esc(work.title)) +
+              (work.meta ? ' <span class="muted">' + esc(work.meta) + "</span>" : "") + "</li>";
+          }).join("") + "</ul></div>");
+      }
+
+      if (evidence.length) {
+        parts.push('<details class="passage-details evidence-group"' + (fromModel ? "" : " open") + "><summary>Evidence behind this section</summary>" +
+          evidence.join("") + "</details>");
+      }
+
+      return parts.join("") || '<p class="muted">No influence or reception evidence was found for this passage.</p>';
+    },
+
+    // Links names in model output that match collected evidence, so backed examples stand out.
     linkEvidence: function (container, packet) {
       if (!container || !packet) {
         return 0;
@@ -415,18 +861,20 @@
       var items = [];
       if (packet.citations) {
         packet.citations.items.forEach(function (item) {
-          items.push({ name: item.title.replace(/,\s*BWV.*$/, "").replace(/\s*\([^)]*\)$/, ""), url: item.url });
+          // "Apocalypse (Dürer)" must not shrink to the generic word "Apocalypse".
+          var short = item.title.replace(/,\s*BWV.*$/, "").replace(/\s*\([^)]*\)$/, "");
+          items.push({ name: short.split(" ").length >= 2 ? short : item.title, url: item.url });
         });
       }
       packet.works.forEach(function (work) {
         items.push({ name: work.title, url: APP.utils.safeUrl(work.url) });
       });
 
-      // Names that merely restate the passage ("Isaiah 41") would be circular evidence.
       var passageNames = [packet.display, packet.chapterArticle && packet.chapterArticle.title, packet.bookArticle && packet.bookArticle.title]
         .filter(Boolean).map(function (name) { return name.toLowerCase(); });
       var seen = {};
       var count = 0;
+
       items.filter(function (item) {
         var key = item.name.toLowerCase();
         var circular = passageNames.some(function (name) {
@@ -464,119 +912,33 @@
         }
       });
 
+      // Scripture references the model cites become buttons that open that passage here.
+      var refPattern = /\b([1-3]\s)?(Genesis|Exodus|Leviticus|Numbers|Deuteronomy|Joshua|Judges|Ruth|Samuel|Kings|Chronicles|Ezra|Nehemiah|Esther|Job|Psalms?|Proverbs|Ecclesiastes|Isaiah|Jeremiah|Lamentations|Ezekiel|Daniel|Hosea|Joel|Amos|Obadiah|Jonah|Micah|Nahum|Habakkuk|Zephaniah|Haggai|Zechariah|Malachi|Matthew|Mark|Luke|John|Acts|Romans|Corinthians|Galatians|Ephesians|Philippians|Colossians|Thessalonians|Timothy|Titus|Philemon|Hebrews|James|Peter|Jude|Revelation)\s(\d{1,3}):(\d{1,3})(?:[–-](\d{1,3}))?\b/;
+      var walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+      var textNodes = [];
+      var textNode;
+      while ((textNode = walker.nextNode())) {
+        if (!textNode.parentElement.closest("a, button")) {
+          textNodes.push(textNode);
+        }
+      }
+      textNodes.forEach(function (nodeToScan) {
+        var current = nodeToScan;
+        var match;
+        while (current && (match = current.nodeValue.match(refPattern))) {
+          var refNode = current.splitText(match.index);
+          current = refNode.splitText(match[0].length);
+          var button = document.createElement("button");
+          button.type = "button";
+          button.className = "scripture-ref";
+          button.setAttribute("data-analyze-ref", match[0].replace("–", "-"));
+          button.title = "Analyze " + match[0];
+          button.textContent = match[0];
+          refNode.parentNode.replaceChild(button, refNode);
+        }
+      });
+
       return count;
-    },
-
-    buildFocus: function (packet, context) {
-      if (!packet) {
-        return '<div class="narrative-card"><p>Passage research was unavailable. Check your connection and try again.</p></div>';
-      }
-
-      var parts = [
-        '<div class="scope-row"><span class="scope-pill scope-' + packet.scope + '">' + packet.scope.toUpperCase() + "</span>" +
-          '<span class="field-help">' + esc(SCOPE_LABELS[packet.scope]) + "</span></div>"
-      ];
-
-      if (context && context.bookSection) {
-        parts.push('<p class="scope-note">' + esc(context.bookSection) + (packet.scope === "book"
-          ? ". The era below reflects the opening section; search a chapter for its own period."
-          : ". The historical era below reflects this section, not the whole book.") + "</p>");
-      }
-
-      parts.push(passageHtml(packet));
-
-      if (packet.scope === "verse") {
-        parts.push(packet.verseNotes.length
-          ? packet.verseNotes.map(function (note, index) {
-            return details("Notes on " + note.heading.toLowerCase(), note.text, index === 0);
-          }).join("")
-          : '<p class="field-help">No verse-specific encyclopedia notes were found for ' + esc(packet.display) +
-            "; the chapter context below still applies.</p>");
-        if (packet.chapterArticle) {
-          parts.push(details("Chapter context: " + packet.chapterArticle.title, packet.chapterArticle.intro, false));
-        }
-      }
-
-      if (packet.scope === "chapter") {
-        if (packet.chapterArticle) {
-          parts.push(details("Chapter overview", packet.chapterArticle.intro, true));
-          packet.chapterAbout.slice(0, 4).forEach(function (item) {
-            parts.push(details(item.heading, item.text, false));
-          });
-        } else {
-          parts.push('<p class="field-help">No dedicated encyclopedia article exists for this chapter; the book overview below applies.</p>');
-        }
-      }
-
-      if (packet.scope !== "book" && packet.placement.length) {
-        parts.push('<div class="passage-block"><h4>Place in the book</h4><ul class="evidence-list">' +
-          packet.placement.map(function (item) {
-            return "<li><strong>" + esc(item.heading) + ":</strong> " + esc(APP.utils.truncate(item.text, 320)) + "</li>";
-          }).join("") + "</ul></div>");
-      }
-
-      if (packet.scope === "book") {
-        if (packet.bookArticle) {
-          parts.push(details("Book overview", packet.bookArticle.intro, true));
-        }
-        packet.bookAbout.slice(0, 6).forEach(function (item) {
-          parts.push(details(item.heading, item.text, false));
-        });
-        parts.push('<p class="field-help">Tip: search a chapter (e.g. ' + esc(packet.book) + " 1) or a verse for passage-level detail.</p>");
-      }
-
-      parts.push('<p class="field-help">Sources: ' + [sourceLink(packet.chapterArticle), sourceLink(packet.bookArticle)].filter(Boolean).join(" · ") + "</p>");
-      return parts.join("");
-    },
-
-    buildSoWhat: function (packet, analysisText, fromModel) {
-      var parts = [];
-
-      if (analysisText) {
-        parts.push('<div class="ai-output">' + (fromModel ? APP.utils.renderMarkdown(analysisText) : APP.utils.textToParagraphs(analysisText)) + "</div>");
-      }
-
-      if (!packet) {
-        return parts.join("");
-      }
-
-      var evidence = [];
-
-      if (packet.citations && packet.citations.items.length) {
-        var others = packet.citations.items.filter(function (item) {
-          return !packet.chapterArticle || item.title !== packet.chapterArticle.title;
-        });
-        evidence.push('<div class="passage-block"><h4>Where "' + esc(packet.citations.phrase) + '" is quoted</h4>' +
-          '<p class="field-help">Referenced in ' + packet.citations.total + " Wikipedia article" + (packet.citations.total === 1 ? "" : "s") +
-          " — hymns, music, liturgy, place names, and more.</p><ul class=\"evidence-list\">" +
-          others.slice(0, 8).map(function (item) {
-            return '<li><a class="source-link" href="' + esc(item.url) + '" target="_blank" rel="noopener noreferrer">' + esc(item.title) + "</a>" +
-              (item.snippet ? ' <span class="muted">— ' + esc(APP.utils.truncate(item.snippet, 140)) + "</span>" : "") + "</li>";
-          }).join("") + "</ul></div>");
-      }
-
-      if (packet.legacy.length) {
-        evidence.push('<div class="passage-block"><h4>Interpretation and influence</h4>' +
-          packet.legacy.slice(0, 5).map(function (item, index) {
-            return details(item.heading + " — " + item.source, item.text, index === 0 && !analysisText);
-          }).join("") + "</div>");
-      }
-
-      if (packet.works.length) {
-        evidence.push('<div class="passage-block"><h4>Scholarship</h4><ul class="evidence-list">' +
-          packet.works.map(function (work) {
-            var url = APP.utils.safeUrl(work.url);
-            return "<li>" + (url ? '<a class="source-link" href="' + esc(url) + '" target="_blank" rel="noopener noreferrer">' + esc(work.title) + "</a>" : esc(work.title)) +
-              (work.meta ? ' <span class="muted">' + esc(work.meta) + "</span>" : "") + "</li>";
-          }).join("") + "</ul></div>");
-      }
-
-      if (evidence.length) {
-        parts.push('<details class="passage-details evidence-group"' + (analysisText ? "" : " open") + "><summary>Evidence behind this section</summary>" +
-          evidence.join("") + "</details>");
-      }
-
-      return parts.join("") || '<p class="muted">No influence or reception evidence was found for this passage.</p>';
     }
   };
 }());

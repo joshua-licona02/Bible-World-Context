@@ -60,8 +60,32 @@
           <textarea
             id="passageText"
             rows="5"
-            placeholder="Optional. The passage is fetched automatically (World English Bible); paste your own translation here to use it instead."
+            placeholder="Optional. The passage is fetched automatically in the translation below; paste other text here to use it instead."
           ></textarea>
+
+          <div class="two-column">
+            <div>
+              <label for="translationSelect">Translation</label>
+              <select id="translationSelect">
+                <option value="BSB">Berean Standard (BSB)</option>
+                <option value="eng_kjv">King James (KJV)</option>
+                <option value="eng_net">NET Bible</option>
+                <option value="ENGWEBP">World English (WEB)</option>
+              </select>
+            </div>
+            <div>
+              <label for="perspectiveSelect">Interpretive lens</label>
+              <select id="perspectiveSelect">
+                <option value="baptist">Baptist</option>
+                <option value="evangelical">Evangelical (general)</option>
+                <option value="academic">Nonsectarian academic</option>
+              </select>
+            </div>
+          </div>
+          <p class="field-help">
+            Commentary comes from John Gill (Baptist) and the Tyndale study notes (evangelical); history may come from any
+            source and is labeled.
+          </p>
 
           <button id="analyzeButton" class="button button-primary full-width" type="submit">
             Analyze Biblical Context

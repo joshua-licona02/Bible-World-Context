@@ -150,9 +150,9 @@
   // Books whose chapters belong to different eras: [firstChapter, lastChapter, eraId, note].
   APP.data.chapterEras = {
     "Isaiah": [
-      [1, 39, "assyrianCrisis", "First Isaiah (chapters 1–39), largely set in the eighth-century Assyrian crisis"],
-      [40, 55, "exile", "Second Isaiah (chapters 40–55), widely dated to the late Babylonian exile"],
-      [56, 66, "persian", "Third Isaiah (chapters 56–66), widely dated to the early Persian-period restoration"]
+      [1, 39, "assyrianCrisis", "Isaiah 1–39 is set in the eighth-century Assyrian crisis during Isaiah's ministry"],
+      [40, 55, "exile", "Isaiah 40–55 addresses the Babylonian exile. Traditional Baptist and evangelical scholarship holds that Isaiah wrote it prophetically in the eighth century BC; many critical scholars instead date it to the exile itself (\"Second Isaiah\")"],
+      [56, 66, "persian", "Isaiah 56–66 addresses the restored community after the exile. Traditional scholarship holds Isaiah's authorship; many critical scholars date it to the early Persian period (\"Third Isaiah\")"]
     ],
     "1 Kings": [
       [1, 11, "unitedMonarchy", "Solomon's reign (chapters 1–11)"],
@@ -177,6 +177,24 @@
       [1, 12, "earlyChurch", "The Jerusalem church and its first expansion (chapters 1–12)"],
       [13, 28, "earlyChurch", "Paul's missionary journeys and voyage to Rome (chapters 13–28)"]
     ]
+  };
+
+  // Standard USFM book codes, used by the Free Use Bible API (bible.helloao.org).
+  APP.data.usfm = {
+    "Genesis": "GEN", "Exodus": "EXO", "Leviticus": "LEV", "Numbers": "NUM", "Deuteronomy": "DEU",
+    "Joshua": "JOS", "Judges": "JDG", "Ruth": "RUT", "1 Samuel": "1SA", "2 Samuel": "2SA",
+    "1 Kings": "1KI", "2 Kings": "2KI", "1 Chronicles": "1CH", "2 Chronicles": "2CH", "Ezra": "EZR",
+    "Nehemiah": "NEH", "Esther": "EST", "Job": "JOB", "Psalms": "PSA", "Proverbs": "PRO",
+    "Ecclesiastes": "ECC", "Song of Solomon": "SNG", "Isaiah": "ISA", "Jeremiah": "JER", "Lamentations": "LAM",
+    "Ezekiel": "EZK", "Daniel": "DAN", "Hosea": "HOS", "Joel": "JOL", "Amos": "AMO",
+    "Obadiah": "OBA", "Jonah": "JON", "Micah": "MIC", "Nahum": "NAM", "Habakkuk": "HAB",
+    "Zephaniah": "ZEP", "Haggai": "HAG", "Zechariah": "ZEC", "Malachi": "MAL",
+    "Matthew": "MAT", "Mark": "MRK", "Luke": "LUK", "John": "JHN", "Acts": "ACT",
+    "Romans": "ROM", "1 Corinthians": "1CO", "2 Corinthians": "2CO", "Galatians": "GAL", "Ephesians": "EPH",
+    "Philippians": "PHP", "Colossians": "COL", "1 Thessalonians": "1TH", "2 Thessalonians": "2TH",
+    "1 Timothy": "1TI", "2 Timothy": "2TI", "Titus": "TIT", "Philemon": "PHM", "Hebrews": "HEB",
+    "James": "JAS", "1 Peter": "1PE", "2 Peter": "2PE", "1 John": "1JN", "2 John": "2JN",
+    "3 John": "3JN", "Jude": "JUD", "Revelation": "REV"
   };
 
   // Wikipedia article titles for books whose articles are not named "Book of <name>".

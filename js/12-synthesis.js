@@ -12,9 +12,28 @@
       "and the historical circumstances of composition."
   };
 
+  var PERSPECTIVES = {
+    baptist: "INTERPRETIVE LENS: Write theological interpretation and application from a conservative Baptist perspective, " +
+      "consistent with the Baptist Faith and Message (2000): Scripture is divinely inspired, true, and authoritative; " +
+      "salvation is by grace through faith in Jesus Christ alone; the whole Bible points to Christ. Lean on the John Gill " +
+      "(Baptist) commentary and the Tyndale study notes for interpretation. Mention Baptist distinctives (believer's baptism, " +
+      "soul liberty, local church autonomy) only where the passage genuinely touches them.",
+    evangelical: "INTERPRETIVE LENS: Write theological interpretation and application from a broadly evangelical perspective " +
+      "that holds Scripture to be inspired and authoritative. Lean on the Tyndale study notes and the John Gill commentary.",
+    academic: "INTERPRETIVE LENS: Write as a nonsectarian historian. Describe religious interpretations without endorsing them."
+  };
+
+  var SOURCE_RULES = "SOURCE RULES: Historical and archaeological facts may come from any source, but say where they come from. " +
+    "When a claim reflects secular or critical scholarship (for example late dating or multiple authorship), label it " +
+    "\"(critical view)\" and state the traditional view alongside it. Label Wikipedia material \"(general reference)\". " +
+    "Quote or cite Gill as \"Gill\" and the study notes as \"Tyndale notes\". Refer to Scripture by exact reference (e.g. Romans 8:31).";
+
   APP.synthesis = {
-    buildPrompt: function (context, sources, packet) {
+    perspectives: PERSPECTIVES,
+
+    buildPrompt: function (context, sources, packet, perspective) {
       var scope = context.scope || "book";
+      var lens = PERSPECTIVES[perspective] ? perspective : "baptist";
       var material = APP.passage.promptMaterial(packet);
       var passageText = context.passageText || APP.passage.focusText(packet);
 
@@ -37,21 +56,30 @@
         : "[No external sources collected.]";
 
       return [
-        "You are a careful historical-context research assistant.",
-        "Write a balanced, nonsectarian analysis.",
+        "You are a careful Bible and history research assistant.",
+        "Write with substance: specific names, places, dates, and Scripture references rather than generalities.",
         "Do not invent quotations, sources, dates, or historical details.",
         "Do not treat a broad continent as a unified civilization.",
         "Distinguish a dated event from a long-running historical period.",
-        "State uncertainty when dates, authorship, or relationships are disputed.",
+        "",
+        PERSPECTIVES[lens],
+        SOURCE_RULES,
         "",
         "SCOPE: " + scope.toUpperCase() + ". " + SCOPE_INSTRUCTIONS[scope],
         "Era: " + context.era.label + (context.bookSection ? " — " + context.bookSection : ""),
         "Date range: " + APP.utils.formatRange(context.start, context.end),
         "Bible reference: " + (context.reference ? context.reference.display : "[No Bible reference]"),
-        "Passage text: " + (passageText || "[No passage text available]"),
+        "Passage text" + (packet && packet.passage ? " (" + packet.passage.translation + ")" : "") + ": " +
+          (passageText || "[No passage text available]"),
         "",
-        "ENCYCLOPEDIA NOTES FOR THIS " + scope.toUpperCase() + ":",
-        material.notes,
+        "COMMENTARY AND STUDY NOTES (primary interpretive sources):",
+        material.commentary,
+        "",
+        "CROSS-REFERENCES (where Scripture echoes this passage):",
+        material.scripture,
+        "",
+        "GENERAL REFERENCE (Wikipedia; historical background only):",
+        material.reference,
         "",
         "RECEPTION AND INFLUENCE EVIDENCE:",
         material.reception,
@@ -69,13 +97,16 @@
         "SO WHAT",
         "CAUTIONS",
         "",
-        "Under SO WHAT, explain how this " + scope + " shaped the wider region and later history, using short labeled paragraphs " +
-          "or bullets: its effect on the original community; how Jewish and Christian traditions (and Islamic, where relevant) " +
-          "interpreted and used it; its political, social, or cultural impact across the Near East, the Mediterranean, and beyond; " +
-          "and its afterlife in liturgy, art, music, literature, or place names. Ground these points in the RECEPTION AND " +
-          "INFLUENCE EVIDENCE, name specific examples from it, and say plainly when influence is indirect, debated, or modest.",
+        "Under SO WHAT, use these bolded sub-headings, each with a substantive paragraph:",
+        "**For the first audience** — what it meant to the people who first heard or read it, in their historical situation.",
+        "**Through the rest of Scripture** — how later Scripture takes up its themes, citing the CROSS-REFERENCES by reference.",
+        "**In church history and the wider region** — how Jewish and Christian communities (including Baptists, where evidenced) " +
+          "used it, and its political, social, or cultural impact across the Near East, the Mediterranean, and beyond.",
+        "**In worship and culture** — hymns, sermons, music, art, or place names, naming examples only from the RECEPTION AND INFLUENCE EVIDENCE.",
+        "**For readers today** — application consistent with the interpretive lens.",
+        "Say plainly when influence is indirect, debated, or modest.",
         "",
-        "Keep the whole response below 1000 words."
+        "Keep the whole response below 1200 words."
       ].join("\n");
     },
 
