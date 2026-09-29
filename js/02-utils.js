@@ -108,7 +108,9 @@
 
       String(text || "").split(/\r?\n/).forEach(function (rawLine) {
         var line = rawLine.trim();
-        var heading = line.match(/^(#{1,4})\s+(.*)$/);
+        // A line that is entirely bold ("**Effect on the community**") is used as a sub-heading by many models.
+        var boldLine = line.match(/^\*\*([^*]+?)\*\*:?$/);
+        var heading = line.match(/^(#{1,4})\s+(.*)$/) || (boldLine ? [line, "###", boldLine[1]] : null);
         var bullet = line.match(/^(?:[-*•]|\d+[.)])\s+(.*)$/);
 
         if (!line) {
@@ -134,6 +136,39 @@
       flushParagraph();
       closeList();
       return html.join("");
+    },
+
+    // Repairs UTF-8 text that was decoded as Windows-1252 ("Godâ€™s" -> "God’s"), as some Bible API
+    // sources ship it. Text that is already clean, or that cannot be mapped back to bytes, is returned as is.
+    fixMojibake: function (text) {
+      var value = String(text || "");
+      if (!/[Â-ô][\u0080-¿ŒœŠšŸŽžƒˆ˜–-›€™]/.test(value)) {
+        return value;
+      }
+
+      var cp1252 = {
+        8364: 128, 8218: 130, 402: 131, 8222: 132, 8230: 133, 8224: 134, 8225: 135, 710: 136, 8240: 137, 352: 138,
+        8249: 139, 338: 140, 381: 142, 8216: 145, 8217: 146, 8220: 147, 8221: 148, 8226: 149, 8211: 150, 8212: 151,
+        732: 152, 8482: 153, 353: 154, 8250: 155, 339: 156, 382: 158, 376: 159
+      };
+      var bytes = new Uint8Array(value.length);
+
+      for (var index = 0; index < value.length; index += 1) {
+        var code = value.charCodeAt(index);
+        if (code < 256) {
+          bytes[index] = code;
+        } else if (cp1252[code] !== undefined) {
+          bytes[index] = cp1252[code];
+        } else {
+          return value;
+        }
+      }
+
+      try {
+        return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+      } catch (error) {
+        return value;
+      }
     },
 
     safeUrl: function (url) {

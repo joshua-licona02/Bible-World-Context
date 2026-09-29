@@ -16,7 +16,15 @@
     },
 
     loadLlmSettings: function () {
-      var stored = APP.core.readStoredSettings().llm || {};
+      var saved = APP.core.readStoredSettings();
+      if (saved.translation) {
+        APP.dom.translationSelect.value = saved.translation;
+      }
+      if (saved.perspective) {
+        APP.dom.perspectiveSelect.value = saved.perspective;
+      }
+
+      var stored = saved.llm || {};
       var provider = stored.provider === "openai" ? "openai" : "ollama";
 
       APP.dom.llmProvider.value = provider;
@@ -111,6 +119,27 @@
       APP.dom.ollamaEndpoint.addEventListener("change", APP.controller.saveSettings);
       APP.dom.ollamaModel.addEventListener("change", APP.controller.saveSettings);
       APP.dom.llmApiKey.addEventListener("change", APP.controller.saveSettings);
+
+      [APP.dom.translationSelect, APP.dom.perspectiveSelect].forEach(function (select) {
+        select.addEventListener("change", function () {
+          APP.core.writeStoredSettings({
+            translation: APP.dom.translationSelect.value,
+            perspective: APP.dom.perspectiveSelect.value
+          });
+        });
+      });
+
+      // Cross-references and Scripture citations open that passage in a new analysis.
+      APP.dom.resultContent.addEventListener("click", function (event) {
+        var button = event.target.closest("[data-analyze-ref]");
+        if (!button) {
+          return;
+        }
+        APP.dom.referenceInput.value = button.getAttribute("data-analyze-ref");
+        APP.dom.passageText.value = "";
+        APP.dom.referenceForm.requestSubmit();
+        APP.dom.referenceInput.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
       APP.dom.llmProvider.addEventListener("change", APP.controller.handleProviderChange);
       APP.dom.llmRefreshModels.addEventListener("click", APP.controller.handleRefreshModels);
 
@@ -350,33 +379,48 @@
           ? context.reference.display + " historical context"
           : context.era.label + " " + APP.utils.formatRange(context.start, context.end));
 
-      if (!useResearch && !userUrls.length) {
-        APP.controller.finishAnalysis(context, []);
-        return;
+      // Passage research (text, verse/chapter/book notes, influence evidence) runs alongside source collection.
+      var passage = context.type === "bible"
+        ? APP.passage.gather(context.reference, { translation: APP.dom.translationSelect.value }).then(function (packet) {
+          APP.core.addAudit("success", "Passage research gathered for " + context.reference.display + " (" + packet.scope + " scope).");
+          return packet;
+        }).catch(function (error) {
+          APP.core.addAudit("warning", "Passage research failed: " + error.message);
+          return null;
+        })
+        : Promise.resolve(null);
+
+      var research = Promise.resolve([]);
+      if (useResearch || userUrls.length) {
+        research = APP.research.collect({
+          useSearch: useResearch,
+          query: topic,
+          urls: userUrls,
+          maxSources: Number(APP.dom.maxSources.value)
+        }).then(function (sources) {
+          APP.core.addAudit("success", "Research collection completed with " + sources.length + " source record(s).");
+          return sources;
+        }).catch(function (error) {
+          APP.core.addAudit("warning", "Research collection failed; local analysis will continue. " + error.message);
+          return [];
+        });
       }
 
-      APP.controller.setFormMessage("Collecting permitted public-source evidence…", "");
+      APP.controller.setFormMessage(context.type === "bible"
+        ? "Reading the " + context.scope + " and collecting evidence…"
+        : "Collecting permitted public-source evidence…", "");
 
-      APP.research.collect({
-        useSearch: useResearch,
-        query: topic,
-        urls: userUrls,
-        maxSources: Number(APP.dom.maxSources.value)
-      }).then(function (sources) {
+      Promise.all([passage, research]).then(function (results) {
         APP.core.setState({
-          researchSources: sources
+          passage: results[0],
+          researchSources: results[1]
         });
-
-        APP.core.addAudit("success", "Research collection completed with " + sources.length + " source record(s).");
-        APP.controller.finishAnalysis(context, sources);
-      }).catch(function (error) {
-        APP.core.addAudit("warning", "Research collection failed; local analysis will continue. " + error.message);
-        APP.controller.finishAnalysis(context, []);
+        APP.controller.finishAnalysis(context, results[1], results[0]);
       });
     },
 
-    finishAnalysis: function (context, sources) {
-      var fallback = APP.model.buildFallbackAnalysis(context);
+    finishAnalysis: function (context, sources, packet) {
+      var fallback = APP.model.buildFallbackAnalysis(context, packet);
 
       if (!APP.state.useOllama) {
         APP.core.setState({
@@ -393,7 +437,7 @@
 
       APP.controller.setFormMessage("Generating synthesis with " + APP.llm.describe() + "…", "");
 
-      APP.llm.generate(APP.synthesis.buildPrompt(context, sources)).then(function (responseText) {
+      APP.llm.generate(APP.synthesis.buildPrompt(context, sources, packet, APP.dom.perspectiveSelect.value), { maxTokens: 2600 }).then(function (responseText) {
         APP.core.setState({
           analysis: APP.synthesis.parse(responseText, fallback),
           isLoading: false
@@ -466,6 +510,22 @@
       APP.dom.referenceBadge.textContent = context.reference
         ? context.reference.display
         : context.era.label;
+
+      var isBible = context.type === "bible";
+      APP.dom.passageSection.classList.toggle("hidden", !isBible);
+      APP.dom.soWhatSection.classList.toggle("hidden", !isBible);
+      if (isBible) {
+        APP.dom.passageTitle.textContent = context.scope === "verse" ? "The Verse" : context.scope === "chapter" ? "The Chapter" : "The Book";
+        APP.dom.passageContent.innerHTML = APP.passageView.buildFocus(APP.state.passage, context);
+        APP.dom.soWhatContent.innerHTML = APP.passageView.buildSoWhat(APP.state.passage, analysis.soWhat, analysis.soWhatFromModel);
+        if (analysis.soWhatFromModel) {
+          var backed = APP.passageView.linkEvidence(APP.dom.soWhatContent.querySelector(".ai-output"), APP.state.passage);
+          APP.dom.soWhatContent.querySelector(".ai-output").insertAdjacentHTML("beforeend",
+            '<p class="ai-footnote">Generated by ' + APP.utils.escapeHtml(APP.llm.describe()) + ". " +
+            (backed ? backed + " named example(s) are linked to the source that backs them; " : "") +
+            "unlinked examples come from the model's general knowledge and should be checked against the evidence below.</p>");
+        }
+      }
 
       APP.dom.blufContent.innerHTML = APP.utils.textToParagraphs(analysis.bluf);
       APP.dom.historicalSettingContent.innerHTML = APP.utils.textToParagraphs(analysis.historicalSetting);

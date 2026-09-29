@@ -25,6 +25,7 @@
     analysis: null,
     regionalRequest: null,
     researchSources: [],
+    passage: null,
     isLoading: false,
     useOllama: false,
     useResearch: false,

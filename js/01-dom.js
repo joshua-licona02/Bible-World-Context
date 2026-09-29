@@ -5,6 +5,8 @@
     referenceForm: document.getElementById("referenceForm"),
     referenceInput: document.getElementById("referenceInput"),
     passageText: document.getElementById("passageText"),
+    translationSelect: document.getElementById("translationSelect"),
+    perspectiveSelect: document.getElementById("perspectiveSelect"),
     analyzeButton: document.getElementById("analyzeButton"),
 
     historicalAnchor: document.getElementById("historicalAnchor"),
@@ -46,6 +48,11 @@
 
     emptyState: document.getElementById("emptyState"),
     resultContent: document.getElementById("resultContent"),
+    passageSection: document.getElementById("passageSection"),
+    passageTitle: document.getElementById("passageTitle"),
+    passageContent: document.getElementById("passageContent"),
+    soWhatSection: document.getElementById("soWhatSection"),
+    soWhatContent: document.getElementById("soWhatContent"),
     blufContent: document.getElementById("blufContent"),
     historicalSettingContent: document.getElementById("historicalSettingContent"),
     applicationContent: document.getElementById("applicationContent"),

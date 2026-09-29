@@ -1247,3 +1247,241 @@ a.provider-badge:hover {
   margin: 0;
   padding: 8px 12px 10px;
 }
+
+/* ---------- Passage focus and "So what?" ---------- */
+
+.scope-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.scope-row .field-help {
+  margin: 0;
+}
+
+.scope-pill {
+  border-radius: 999px;
+  padding: 3px 10px;
+  color: #07121f;
+  font-size: 0.68rem;
+  font-weight: 850;
+  letter-spacing: 0.1em;
+}
+
+.scope-verse {
+  background: var(--gold);
+}
+
+.scope-chapter {
+  background: var(--accent);
+}
+
+.scope-book {
+  background: var(--purple);
+}
+
+.scope-note {
+  border-left: 3px solid var(--gold);
+  padding-left: 10px;
+  color: var(--text-soft);
+  font-size: 0.82rem;
+}
+
+.passage-text {
+  margin: 12px 0 4px;
+  border-left: 3px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+  padding: 12px 14px;
+  color: var(--text-muted);
+  background: rgba(104, 184, 255, 0.05);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 0.98rem;
+  line-height: 1.7;
+}
+
+.passage-chapter {
+  max-height: 340px;
+  overflow-y: auto;
+  color: var(--text);
+}
+
+.verse sup {
+  margin-right: 3px;
+  color: var(--accent);
+  font-family: var(--font);
+  font-size: 0.66rem;
+  font-weight: 800;
+}
+
+.verse-focus {
+  color: var(--text);
+}
+
+.passage-text:not(.passage-chapter) .verse-focus {
+  border-radius: 3px;
+  background: rgba(230, 187, 98, 0.12);
+  box-shadow: 0 0 0 2px rgba(230, 187, 98, 0.12);
+}
+
+.passage-details {
+  margin-top: 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: 9px;
+  padding: 8px 12px;
+  background: rgba(4, 12, 22, 0.25);
+}
+
+.passage-details summary {
+  color: var(--text);
+  font-size: 0.84rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.passage-details[open] summary {
+  margin-bottom: 8px;
+}
+
+.passage-details p {
+  font-size: 0.85rem;
+}
+
+.passage-block {
+  margin-top: 14px;
+}
+
+.passage-block h4 {
+  margin: 0 0 6px;
+  color: var(--text-soft);
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.evidence-group {
+  margin-top: 14px;
+}
+
+.evidence-link {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--green);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+.evidence-link:hover {
+  color: var(--green);
+}
+
+/* ---------- Source perspective labels and commentary ---------- */
+
+.source-badge {
+  display: inline-block;
+  margin-left: 6px;
+  border-radius: 5px;
+  padding: 1px 7px;
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  vertical-align: 1px;
+  cursor: help;
+}
+
+.source-gill {
+  border: 1px solid rgba(230, 187, 98, 0.6);
+  color: var(--gold);
+}
+
+.source-tyndale {
+  border: 1px solid rgba(97, 196, 156, 0.6);
+  color: var(--green);
+}
+
+.source-crossref {
+  border: 1px solid rgba(104, 184, 255, 0.6);
+  color: var(--accent);
+}
+
+.source-wikipedia,
+.source-openalex {
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+.source-note {
+  margin: 10px 0 0;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-style: italic;
+}
+
+.note-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 18px;
+  font-size: 0.86rem;
+  line-height: 1.55;
+}
+
+.note-list strong {
+  color: var(--green);
+}
+
+.gill-comment {
+  margin-bottom: 12px;
+  font-size: 0.86rem;
+}
+
+.gill-comment strong {
+  color: var(--gold);
+}
+
+.passage-heading {
+  display: block;
+  margin: 12px 0 4px;
+  color: var(--accent);
+  font-family: var(--font);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.passage-heading:first-child {
+  margin-top: 0;
+}
+
+.passage-details h5 {
+  margin: 12px 0 4px;
+  color: var(--text);
+  font-size: 0.82rem;
+}
+
+.crossref-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 18px;
+  font-size: 0.85rem;
+}
+
+.crossref-text {
+  color: var(--text-soft);
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+.scripture-ref {
+  border: 0;
+  border-bottom: 1px dotted var(--accent);
+  padding: 0;
+  color: var(--accent);
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
