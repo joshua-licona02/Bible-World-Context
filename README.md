@@ -1,10 +1,16 @@
 # Bible-World-Context
 
-A local-first research explorer that places Biblical passages alongside Biblical events, world history, and region-specific developments.
+A local-first research explorer that shows Biblical history within world history, and how the events of the wider world shaped the beginning and growth of Christianity.
+
+**Full documentation:** [docs/DOCUMENTATION.md](docs/DOCUMENTATION.md): how everything works, the code, data sources, how AI is used, and how to extend it.
 
 ## Features
 
-- **Context analysis** — enter a Bible reference (e.g. `Daniel 6`, `1 Kings 18:20-39`) to see its historical era, a swimlane timeline, regional comparison, and event tables. Optional AI synthesis.
+- **Context analysis** — enter a verse, chapter, or book (e.g. `Isaiah 41:10`, `Isaiah 41`, `Isaiah`) for detail at that level:
+  - Passage text (BSB, KJV, NET, WEB; ESV and NIV with your own free API keys)
+  - Tyndale study notes and book introductions, with each source labeled by perspective
+  - **World Connections**: curated developments of the era (Koine Greek, the Septuagint, the Pax Romana, and more) and how they shaped Christianity's growth
+  - The era's timeline, regional comparison, and optional AI synthesis with a Baptist (default), evangelical, or academic lens
 - **Timeline search** — ask a question (e.g. *"What was happening in China and India during the Babylonian exile?"*), give keywords, or a year range. Results from multiple public sources are merged into one timeline with duplicates combined, confidence scores, and an evidence trail for every event.
   - Wikipedia year / decade / century chronicle pages (events by region)
   - Wikipedia search with Wikidata dates, precision, and coordinates
@@ -28,7 +34,9 @@ as files send `Origin: null`, which Ollama rejects. Serving from localhost avoid
 
 ## AI settings
 
-Click **AI settings** in the top bar to choose the provider, server URL, and model. Installed Ollama models are detected automatically. API keys (for hosted services) are kept in memory only and never saved.
+Click **AI settings** in the top bar to choose the provider, server URL, and model. Installed Ollama models are detected automatically. A hosted AI provider's API key is kept in memory only and never saved.
+
+The same dialog takes optional keys for licensed Bible translations: ESV (free at api.esv.org) and API.Bible (free at scripture.api.bible; includes the NIV only if your key is licensed for it). These keys are saved in this browser only.
 
 ## Notes
 
