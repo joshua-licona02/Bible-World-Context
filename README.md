@@ -20,15 +20,11 @@ A local-first research explorer that places Biblical passages alongside Biblical
 
 ## Running
 
-No build step or dependencies. Serve the folder from localhost and open it in a browser:
+Double-click **`Start Bible World Context.bat`**. It serves the folder at <http://localhost:5510> (using Python) and opens
+it in your browser; close the "Bible World Context server" window to stop it.
 
-```bash
-python -m http.server 5510
-```
-
-Then visit <http://localhost:5510>.
-
-Opening `index.html` directly from disk also works for the public sources, but Ollama rejects pages opened from a file by default. To allow it, set `OLLAMA_ORIGINS=*` and restart Ollama.
+Opening `index.html` directly also works for Scripture, commentary, and history sources, but not for Ollama: pages opened
+as files send `Origin: null`, which Ollama rejects. Serving from localhost avoids this without changing Ollama's settings.
 
 ## AI settings
 

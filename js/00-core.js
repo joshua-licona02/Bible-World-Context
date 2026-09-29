@@ -26,6 +26,7 @@
     regionalRequest: null,
     researchSources: [],
     passage: null,
+    bibleKeys: { esv: "", apiBible: "" },
     isLoading: false,
     useOllama: false,
     useResearch: false,

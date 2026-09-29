@@ -168,9 +168,6 @@
         if (note) {
           parts.push("Tyndale notes: " + lead(note.text, 2));
         }
-        if (packet.gill[0]) {
-          parts.push("Gill (Baptist): " + lead(packet.gill[0].text.replace(/^[^.]*\.{3,4}\s*/, ""), 2));
-        }
       } else if (packet.scope === "chapter") {
         var summary = packet.notes.filter(function (item) {
           return item.last > item.first;
@@ -191,40 +188,23 @@
       return parts.join("\n\n");
     },
 
-    // Without a model, "So what?" is assembled from Scripture cross-references, Baptist commentary,
-    // evangelical notes, and cultural references, each attributed.
-    fallbackSoWhat: function (packet) {
-      if (!packet) {
-        return "";
-      }
-
-      var lead = APP.passage.firstSentences;
+    // Without a model, World Connections opens with a short orientation; the development cards follow it.
+    fallbackConnections: function (context) {
+      var factors = APP.growth.forRange(context.start, context.end);
+      var world = context.worldEvents.map(function (event) {
+        return event.title;
+      });
       var lines = [];
 
-      if (packet.crossRefs.length) {
-        lines.push("Through the rest of Scripture: " + packet.display + " is most often read alongside " +
-          packet.crossRefs.slice(0, 5).map(function (ref) { return ref.reference; }).join(", ") +
-          " (OpenBible cross-references). See the passages below.");
+      if (world.length) {
+        lines.push("The world around " + (context.reference ? context.reference.display : "this period") + " (" +
+          APP.utils.formatRange(context.start, context.end) + "): " + world.slice(0, 4).join("; ") + ".");
       }
-      if (packet.scope === "chapter" && packet.gillIntro) {
-        lines.push("Baptist commentary (John Gill, introducing the chapter): " + APP.utils.truncate(lead(packet.gillIntro, 3), 600));
-      } else if (packet.scope !== "book" && packet.gill.length) {
-        lines.push("Baptist commentary (John Gill, on verse " + packet.gill[0].verse + "): " +
-          APP.utils.truncate(lead(packet.gill[0].text.replace(/^[^.]*\.{3,4}\s*/, ""), 3), 600));
+      if (factors.length) {
+        lines.push(factors.length + " development" + (factors.length === 1 ? "" : "s") + " from this era shaped how Christianity began or spread: " +
+          factors.map(function (factor) { return factor.title; }).join("; ") + ". Each is summarized below with its Scripture ties and a source.");
       }
-      if (packet.message) {
-        lines.push("The book's message (Tyndale notes): " + APP.utils.truncate(lead(packet.message.text, 3), 600));
-      }
-      if (packet.citations && packet.citations.items.length) {
-        lines.push("In worship and culture: referenced in works such as " + packet.citations.items.slice(0, 4).map(function (item) {
-          return item.title;
-        }).join("; ") + " (general reference).");
-      }
-
-      if (!lines.length) {
-        return "No influence evidence was collected for this passage.";
-      }
-      lines.push("Turn on AI synthesis for a fuller account of how this passage shaped its region, with these sources as evidence.");
+      lines.push("Turn on AI synthesis to have these connections explained in relation to this passage.");
       return lines.join("\n\n");
     },
 
@@ -283,8 +263,8 @@
 
       return {
         source: "Local historical context engine",
-        soWhat: APP.model.fallbackSoWhat(packet),
-        soWhatFromModel: false,
+        connections: context.type === "bible" ? APP.model.fallbackConnections(context) : "",
+        connectionsFromModel: false,
         bluf:
           (passageLine ? passageLine + "\n\n" : "") +
           context.era.label + (context.bookSection ? " (" + context.bookSection + ")" : "") +

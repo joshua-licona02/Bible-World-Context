@@ -1392,23 +1392,12 @@ a.provider-badge:hover {
   cursor: help;
 }
 
-.source-gill {
-  border: 1px solid rgba(230, 187, 98, 0.6);
-  color: var(--gold);
-}
-
 .source-tyndale {
   border: 1px solid rgba(97, 196, 156, 0.6);
   color: var(--green);
 }
 
-.source-crossref {
-  border: 1px solid rgba(104, 184, 255, 0.6);
-  color: var(--accent);
-}
-
-.source-wikipedia,
-.source-openalex {
+.source-wikipedia {
   border: 1px solid var(--border);
   color: var(--text-muted);
 }
@@ -1433,15 +1422,6 @@ a.provider-badge:hover {
   color: var(--green);
 }
 
-.gill-comment {
-  margin-bottom: 12px;
-  font-size: 0.86rem;
-}
-
-.gill-comment strong {
-  color: var(--gold);
-}
-
 .passage-heading {
   display: block;
   margin: 12px 0 4px;
@@ -1463,19 +1443,6 @@ a.provider-badge:hover {
   font-size: 0.82rem;
 }
 
-.crossref-list {
-  display: grid;
-  gap: 8px;
-  margin: 0;
-  padding-left: 18px;
-  font-size: 0.85rem;
-}
-
-.crossref-text {
-  color: var(--text-soft);
-  font-family: Georgia, "Times New Roman", serif;
-}
-
 .scripture-ref {
   border: 0;
   border-bottom: 1px dotted var(--accent);
@@ -1484,4 +1451,58 @@ a.provider-badge:hover {
   background: none;
   font: inherit;
   cursor: pointer;
+}
+
+.source-curated {
+  border: 1px solid rgba(182, 156, 255, 0.6);
+  color: var(--purple);
+}
+
+/* ---------- World Connections ---------- */
+
+.growth-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 10px;
+}
+
+.growth-card {
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: rgba(4, 12, 22, 0.35);
+  font-size: 0.84rem;
+  line-height: 1.55;
+}
+
+.growth-card h4 {
+  margin: 6px 0 8px;
+  color: var(--text);
+  font-size: 0.92rem;
+}
+
+.growth-card p {
+  margin-bottom: 8px;
+}
+
+.growth-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.growth-kind {
+  color: var(--purple);
+}
+
+.growth-date {
+  color: var(--gold);
+}
+
+.growth-refs {
+  font-size: 0.8rem;
 }

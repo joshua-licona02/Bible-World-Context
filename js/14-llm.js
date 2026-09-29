@@ -292,8 +292,8 @@
         var fromFile = window.location.protocol === "file:";
         return "The browser could not reach the model server. Confirm it is running at the configured URL. " +
           (fromFile
-            ? "This page is opened from a file, so the browser sends Origin: null, which Ollama rejects by default. " +
-              "Set the environment variable OLLAMA_ORIGINS=* (or serve this folder from localhost) and restart Ollama."
+            ? "This page is opened as a file, which Ollama rejects by default. Close this tab and open the app with " +
+              "\"Start Bible World Context.bat\" in the app folder instead; it serves the app from localhost, which Ollama accepts."
             : "If it is running, allow this page's origin (for Ollama, set OLLAMA_ORIGINS) and restart it.");
       }
 
